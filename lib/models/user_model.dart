@@ -11,7 +11,6 @@ class User {
     required this.password,
   });
 
-  // Convert User object to Map (untuk menyimpan ke DB)
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -21,7 +20,6 @@ class User {
     };
   }
 
-  // Convert Map to User object (untuk mengambil dari DB)
   factory User.fromMap(Map<String, dynamic> map) {
     return User(
       id: map['id'],
