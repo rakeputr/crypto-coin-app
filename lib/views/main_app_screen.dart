@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:project_crypto_app/views/home_screen.dart';
-import 'package:project_crypto_app/views/placeholder_screen.dart';
+import 'package:project_crypto_app/views/trend_screen.dart';
 import 'package:project_crypto_app/views/user_screen.dart';
 
 class MainAppScreen extends StatefulWidget {
@@ -17,7 +17,7 @@ class _MainAppScreenState extends State<MainAppScreen> {
 
   final List<Widget> _widgetOptions = <Widget>[
     const HomeScreen(),
-    const PlaceholderScreen(title: 'Favorit'),
+    const TrendScreen(),
     const UserScreen(),
   ];
 
@@ -27,38 +27,18 @@ class _MainAppScreenState extends State<MainAppScreen> {
     });
   }
 
-  String _getAppBarTitle(int index) {
-    switch (index) {
-      case 1:
-        return 'Favorit Anda';
-      case 2:
-        return 'Profil Pengguna';
-      default:
-        return '';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: _selectedIndex != 0
-          ? AppBar(
-              title: Text(
-                _getAppBarTitle(_selectedIndex),
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              backgroundColor: _primaryColor,
-              foregroundColor: Colors.white,
-              elevation: 0,
-            )
-          : null,
-
       body: Center(child: _widgetOptions.elementAt(_selectedIndex)),
 
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Beranda'),
-          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Favorit'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.trending_up),
+            label: 'Trend',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
         ],
         currentIndex: _selectedIndex,

@@ -53,6 +53,16 @@ class _UserScreenState extends State<UserScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
+
+      appBar: AppBar(
+        title: Text(
+          "Profil Pengguna",
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: _primaryColor,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
       body: FutureBuilder<User?>(
         future: _currentUserFuture,
         builder: (context, snapshot) {
