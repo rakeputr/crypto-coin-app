@@ -3,7 +3,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import '../models/coin_model.dart';
 import '../services/coin_service.dart';
-import 'detail_screen.dart';
 
 class TrendScreen extends StatefulWidget {
   const TrendScreen({super.key});
@@ -18,6 +17,10 @@ class _TrendScreenState extends State<TrendScreen> {
   bool _isLoading = true;
   String _country = "Negara Tidak Dikenal";
   String _currency = "usd";
+
+  // Konstanta warna utama
+  static const Color _primaryColor = Color(0xFF7B1FA2);
+  static const Color _accentColor = Color(0xFFE53935);
 
   @override
   void initState() {
@@ -68,9 +71,14 @@ class _TrendScreenState extends State<TrendScreen> {
     } catch (e) {
       if (!mounted) return;
 
+      // Tangani error, misal timeout atau rate limiting
+      String errorMsg = e.toString().contains('429')
+          ? "Terlalu banyak permintaan (429). Coba lagi nanti."
+          : "Gagal mengambil lokasi atau data.";
+
       setState(() {
         _isLoading = false;
-        _country = "Gagal mengambil lokasi";
+        _country = errorMsg;
       });
     }
   }
@@ -86,11 +94,21 @@ class _TrendScreenState extends State<TrendScreen> {
         children: [
           _buildGradientHeaderCard(topPadding),
           Padding(
-            padding: EdgeInsets.only(top: topPadding + 200),
+            padding: EdgeInsets.only(
+              top: topPadding + 110,
+            ), // Disesuaikan sedikit
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(
+                    child: CircularProgressIndicator(color: _primaryColor),
+                  )
                 : _coins.isEmpty
-                ? const Center(child: Text("Tidak ada data crypto ditemukan"))
+                ? Center(
+                    child: Text(
+                      "$_country\nTidak ada data crypto ditemukan.",
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.black54),
+                    ),
+                  )
                 : Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20.0),
                     child: Column(
@@ -98,7 +116,7 @@ class _TrendScreenState extends State<TrendScreen> {
                       children: [
                         const SizedBox(height: 16),
                         Text(
-                          "Trending di $_country ($_currency) 🔥",
+                          "Trending di $_country (${_currency.toUpperCase()}) 🔥",
                           style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -107,6 +125,7 @@ class _TrendScreenState extends State<TrendScreen> {
                         ),
                         Expanded(
                           child: ListView.builder(
+                            padding: const EdgeInsets.only(top: 10, bottom: 20),
                             itemCount: _coins.length,
                             itemBuilder: (context, index) {
                               final coin = _coins[index];
@@ -117,15 +136,8 @@ class _TrendScreenState extends State<TrendScreen> {
                                     'Harga: ${_currency.toUpperCase()} ${coin.currentPrice.toStringAsFixed(2)} | 24h: ${coin.priceChangePercentage24h.toStringAsFixed(2)}%',
                                 imageUrl: coin.image,
                                 isUp: coin.priceChangePercentage24h >= 0,
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          DetailScreen(coin: coin),
-                                    ),
-                                  );
-                                },
+                                // 🔥🔥 HAPUS FUNGSI ONTAP
+                                onTap: () {},
                               );
                             },
                           ),
@@ -142,7 +154,7 @@ class _TrendScreenState extends State<TrendScreen> {
   Widget _buildGradientHeaderCard(double topPadding) {
     return Container(
       width: double.infinity,
-      height: topPadding + 190,
+      height: topPadding + 110,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFF7B1FA2), Color(0xFFE53935)],
@@ -190,12 +202,14 @@ class _TrendScreenState extends State<TrendScreen> {
     );
   }
 
+  // 🔥 Fungsi ini diubah agar onTap bisa menjadi VoidCallback (opsional) atau diabaikan
   Widget _buildCryptoCard({
     required String title,
     required String subtitle,
     required String imageUrl,
     required bool isUp,
-    required VoidCallback onTap,
+    // 🔥 Ubah tipe data onTap dari required VoidCallback menjadi VoidCallback?
+    VoidCallback? onTap,
   }) {
     return Card(
       elevation: 5,
@@ -218,7 +232,7 @@ class _TrendScreenState extends State<TrendScreen> {
         subtitle: Text(subtitle),
         trailing: Icon(
           isUp ? Icons.trending_up : Icons.trending_down,
-          color: isUp ? Colors.green : Colors.red,
+          color: isUp ? Colors.green.shade700 : _accentColor,
           size: 28,
         ),
         onTap: onTap,

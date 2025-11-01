@@ -78,77 +78,81 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
   Widget build(BuildContext context) {
     // Karena FavoriteScreen ada di BottomNav, kita TIDAK perlu Gradient Header Card
     // Kita akan gunakan AppBar standar dari MainAppScreen (yang sudah Anda atur)
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          const SizedBox(height: 16),
-          const Text(
-            'Koin Favorit Anda',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: _primaryColor,
-            ),
-          ),
-          const SizedBox(height: 20),
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
 
-          // FutureBuilder untuk menampilkan daftar favorit
-          Expanded(
-            child: FutureBuilder<List<CoinModel>>(
-              future: _favoriteCoinsFuture,
-              builder: (context, snapshot) {
-                if (_currentUserId == null) {
-                  return const Center(
-                    child: Text(
-                      'Anda harus login untuk melihat daftar favorit.',
-                    ),
-                  );
-                }
+      appBar: AppBar(
+        title: Text(
+          "Koin Favorit",
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: _primaryColor,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const SizedBox(height: 20),
 
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: _primaryColor),
-                  );
-                } else if (snapshot.hasError) {
-                  return Center(
-                    child: Text('Error memuat data: ${snapshot.error}'),
-                  );
-                } else if (snapshot.data!.isEmpty) {
-                  return Center(
-                    child: Text('Anda belum menambahkan koin ke favorit.'),
-                  );
-                } else {
-                  final favoriteCoins = snapshot.data!;
-                  return ListView.builder(
-                    itemCount: favoriteCoins.length,
-                    // Tambahkan padding di bawah agar tidak tertutup BottomNav
-                    padding: const EdgeInsets.only(bottom: 20),
-                    itemBuilder: (context, index) {
-                      final coin = favoriteCoins[index];
-                      return _buildCryptoCard(
-                        context,
-                        coin: coin,
-                        onTap: () async {
-                          // Navigasi ke detail dan tunggu (await) sampai kembali
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => DetailScreen(coin: coin),
-                            ),
-                          );
-                          // 🔥 Refresh list setelah kembali (untuk melihat perubahan favorite)
-                          _refreshFavorites();
-                        },
-                      );
-                    },
-                  );
-                }
-              },
+            // FutureBuilder untuk menampilkan daftar favorit
+            Expanded(
+              child: FutureBuilder<List<CoinModel>>(
+                future: _favoriteCoinsFuture,
+                builder: (context, snapshot) {
+                  if (_currentUserId == null) {
+                    return const Center(
+                      child: Text(
+                        'Anda harus login untuk melihat daftar favorit.',
+                      ),
+                    );
+                  }
+
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(color: _primaryColor),
+                    );
+                  } else if (snapshot.hasError) {
+                    return Center(
+                      child: Text('Error memuat data: ${snapshot.error}'),
+                    );
+                  } else if (snapshot.data!.isEmpty) {
+                    return Center(
+                      child: Text('Anda belum menambahkan koin ke favorit.'),
+                    );
+                  } else {
+                    final favoriteCoins = snapshot.data!;
+                    return ListView.builder(
+                      itemCount: favoriteCoins.length,
+                      // Tambahkan padding di bawah agar tidak tertutup BottomNav
+                      padding: const EdgeInsets.only(bottom: 20),
+                      itemBuilder: (context, index) {
+                        final coin = favoriteCoins[index];
+                        return _buildCryptoCard(
+                          context,
+                          coin: coin,
+                          onTap: () async {
+                            // Navigasi ke detail dan tunggu (await) sampai kembali
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => DetailScreen(coin: coin),
+                              ),
+                            );
+                            // 🔥 Refresh list setelah kembali (untuk melihat perubahan favorite)
+                            _refreshFavorites();
+                          },
+                        );
+                      },
+                    );
+                  }
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
