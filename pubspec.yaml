@@ -41,6 +41,8 @@ dependencies:
   intl: ^0.20.2
   flutter_local_notifications: ^17.2.1
   timezone: ^0.9.4
+  flutter_map: ^6.1.0  # 🔥 Package untuk menampilkan peta OpenStreetMap
+  latlong2: ^0.9.1     # 🔥 Package untuk mengelola koordinat (LatLng)
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

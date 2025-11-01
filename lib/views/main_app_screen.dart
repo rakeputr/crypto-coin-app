@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:project_crypto_app/views/community_map_screen.dart';
 import 'package:project_crypto_app/views/home_screen.dart';
-import 'package:project_crypto_app/views/favorite_screen.dart'; // 🔥 Import FavoriteScreen
-import 'package:project_crypto_app/views/trend_screen.dart';
+import 'package:project_crypto_app/views/favorite_screen.dart';
 import 'package:project_crypto_app/views/user_screen.dart';
 
 class MainAppScreen extends StatefulWidget {
@@ -20,7 +20,7 @@ class _MainAppScreenState extends State<MainAppScreen> {
   final List<Widget> _widgetOptions = <Widget>[
     const HomeScreen(), // Index 0: Beranda
     const FavoriteScreen(), // Index 1: Favorite (Baru)
-    const TrendScreen(), // Index 2: Trend (Bergeser)
+    const CommunityMapScreen(), // Index 2: Trend (Bergeser)
     const UserScreen(), // Index 3: Profil (Bergeser)
   ];
 
@@ -44,8 +44,8 @@ class _MainAppScreenState extends State<MainAppScreen> {
             label: 'Favorite',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.trending_up),
-            label: 'Trend',
+            icon: Icon(Icons.people_alt),
+            label: 'Komunitas',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
         ],

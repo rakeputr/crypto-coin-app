@@ -23,6 +23,13 @@ class DatabaseHelper {
   static const String favUserId = 'userId';
   static const String favCoinId = 'coinId';
 
+  // ==== COMMUNITIES TABLE ====
+  static const String commTable = 'communities';
+  static const String commId = 'id';
+  static const String commName = 'name';
+  static const String commLat = 'latitude'; // REAL untuk double
+  static const String commLon = 'longitude'; // REAL untuk double
+
   // ===== INIT DATABASE =====
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -36,14 +43,39 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      // Versi dinaikkan ke 4 untuk memicu _onUpgrade jika diperlukan
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
   }
 
+  // Fungsi untuk memasukkan dummy data komunitas di Yogyakarta
+  Future<void> _insertYogyaDummyData(Database db) async {
+    await db.insert(commTable, {
+      commName: 'Komunitas NFT UPN "Veteran" YK',
+      commLat: -7.7785, // Di dalam area kampus
+      commLon: 110.4075,
+    });
+    await db.insert(commTable, {
+      commName: 'Warung Kopi & Diskusi Blockchain (Seturan)',
+      commLat: -7.7720, // Sekitar Seturan
+      commLon: 110.4020,
+    });
+    await db.insert(commTable, {
+      commName: 'Grup Trading Harian Jogja',
+      commLat: -7.7850, // Sekitar Babarsari
+      commLon: 110.4150,
+    });
+    await db.insert(commTable, {
+      commName: 'Meetup Programmer Web3 (Ring Road)',
+      commLat: -7.7800,
+      commLon: 110.3800,
+    });
+  }
+
   Future<void> _onCreate(Database db, int version) async {
-    // Create users table
+    // 1. Create users table
     await db.execute('''
       CREATE TABLE $userTable (
         $columnId INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,7 +85,7 @@ class DatabaseHelper {
       )
     ''');
 
-    // Create favorites table
+    // 2. Create favorites table
     await db.execute('''
       CREATE TABLE $favTable (
         $favId INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,10 +93,23 @@ class DatabaseHelper {
         $favCoinId TEXT NOT NULL
       )
     ''');
+
+    // 3. Create communities table
+    await db.execute('''
+      CREATE TABLE $commTable (
+        $commId INTEGER PRIMARY KEY AUTOINCREMENT,
+        $commName TEXT NOT NULL,
+        $commLat REAL NOT NULL,
+        $commLon REAL NOT NULL
+      )
+    ''');
+
+    // Panggil fungsi untuk memasukkan data dummy Jogja
+    await _insertYogyaDummyData(db);
   }
 
-  // Handle database upgrade (jaga-jaga kalau database lama belum ada tabel favorites)
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    // Jika upgrade dari versi lama (< 2), buat tabel favorites
     if (oldVersion < 2) {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS $favTable (
@@ -73,6 +118,23 @@ class DatabaseHelper {
           $favCoinId TEXT NOT NULL
         )
       ''');
+    }
+    // Jika upgrade dari versi lama (< 3), buat tabel communities
+    if (oldVersion < 3) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS $commTable (
+          $commId INTEGER PRIMARY KEY AUTOINCREMENT,
+          $commName TEXT NOT NULL,
+          $commLat REAL NOT NULL,
+          $commLon REAL NOT NULL
+        )
+      ''');
+    }
+    // Jika database di-upgrade ke versi 4 (untuk memastikan data default baru masuk)
+    if (newVersion >= 4) {
+      // Hapus data lama komunitas (jika ada) dan masukkan data Yogyakarta yang baru
+      await db.delete(commTable);
+      await _insertYogyaDummyData(db);
     }
   }
 
@@ -181,5 +243,28 @@ class DatabaseHelper {
       where: '$favUserId = ?',
       whereArgs: [userId],
     );
+  }
+
+  // ===============================
+  // ==== COMMUNITY FUNCTIONS ====
+  // ===============================
+
+  Future<List<Map<String, dynamic>>> getAllCommunities() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(commTable);
+    return maps;
+  }
+
+  Future<int> addCommunity({
+    required String name,
+    required double lat,
+    required double lon,
+  }) async {
+    final db = await database;
+    return await db.insert(commTable, {
+      commName: name,
+      commLat: lat,
+      commLon: lon,
+    });
   }
 }
