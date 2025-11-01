@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:project_crypto_app/views/detail_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/coin_model.dart';
 import '../services/coin_service.dart';
 
@@ -12,24 +13,35 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late Future<List<CoinModel>> futureCoins;
-
   List<CoinModel> allCoins = [];
-
   List<CoinModel> filteredCoins = [];
 
   final TextEditingController searchController = TextEditingController();
 
+  String? fullName;
+
   @override
   void initState() {
     super.initState();
-
     futureCoins = CoinService().fetchCoins();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedName = prefs.getString('fullName');
+    debugPrint('Nama dari prefs: $savedName');
+
+    if (mounted) {
+      setState(() {
+        fullName = savedName ?? 'User';
+      });
+    }
   }
 
   @override
   void dispose() {
     searchController.dispose();
-
     super.dispose();
   }
 
@@ -38,15 +50,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (query.isEmpty) {
       setState(() => filteredCoins = allCoins);
-
       return;
     }
 
     final results = allCoins.where((coin) {
       final nameLower = coin.name.toLowerCase();
-
       final symbolLower = coin.symbol.toLowerCase();
-
       return nameLower.contains(searchLower) ||
           symbolLower.contains(searchLower);
     }).toList();
@@ -57,7 +66,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-
     final topPadding = mediaQuery.padding.top;
 
     return Scaffold(
@@ -77,7 +85,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 } else {
                   if (allCoins.isEmpty) {
                     allCoins = snapshot.data!;
-
                     filteredCoins = allCoins;
                   }
 
@@ -87,7 +94,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 16),
-
                         const Text(
                           'Rekomendasi Crypto',
                           style: TextStyle(
@@ -96,13 +102,11 @@ class _HomeScreenState extends State<HomeScreen> {
                             color: Colors.black87,
                           ),
                         ),
-
                         Expanded(
                           child: ListView.builder(
                             itemCount: filteredCoins.length,
                             itemBuilder: (context, index) {
                               final coin = filteredCoins[index];
-
                               return _buildCryptoCard(
                                 context,
                                 title:
@@ -139,21 +143,17 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildGradientHeaderCard(BuildContext context, double topPadding) {
     return Container(
       width: double.infinity,
-
       height: topPadding + 190,
-
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFF7B1FA2), Color(0xFFE53935)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-
         borderRadius: BorderRadius.only(
           bottomLeft: Radius.circular(50.0),
           bottomRight: Radius.circular(50.0),
         ),
-
         boxShadow: [
           BoxShadow(
             color: Colors.black26,
@@ -162,18 +162,15 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-
       child: Padding(
         padding: EdgeInsets.fromLTRB(30, topPadding + 10, 30, 20),
-
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 10),
-
-            const Text(
-              'Hi, User',
-              style: TextStyle(
+            Text(
+              fullName == null ? 'Hi,' : 'Hi, $fullName',
+              style: const TextStyle(
                 color: Colors.white70,
                 fontSize: 18,
                 fontWeight: FontWeight.w500,
@@ -181,18 +178,15 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
 
             const SizedBox(height: 5),
-
             const Text(
-              'Lihat Harga Crypto Saat Ini',
+              'Lihat Harga Coin Crypto Saat Ini',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 24,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
             ),
-
             const SizedBox(height: 20),
-
             _buildSearchBar(context),
           ],
         ),
@@ -212,7 +206,6 @@ class _HomeScreenState extends State<HomeScreen> {
         style: const TextStyle(color: Colors.white),
         onChanged: (query) {
           _filterCoins(query);
-
           setState(() {});
         },
         decoration: InputDecoration(

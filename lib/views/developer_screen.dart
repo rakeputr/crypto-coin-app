@@ -119,7 +119,7 @@ class DeveloperScreen extends StatelessWidget {
               ),
             ),
             const Text(
-              'Kuliah Mobile sangat menantang dan membuka wawasan baru mengenai pengembangan aplikasi lintas platform, terutama dengan Flutter. Meskipun rumit, proses debugging dan melihat aplikasi berjalan di perangkat terasa sangat memuaskan.',
+              'Kuliah Mobile sangat menantang dan membuka wawasan baru mengenai pengembangan aplikasi dengan Flutter. Meskipun agak rumit karena proses debuggingnya lumayan menguras tenaga',
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.black87,
@@ -136,7 +136,7 @@ class DeveloperScreen extends StatelessWidget {
               ),
             ),
             const Text(
-              'Semoga materi praktikum dan proyek ke depan dapat memberikan lebih banyak studi kasus nyata yang membutuhkan integrasi API kompleks dan LBS lebih lanjut. Terima kasih!',
+              'Semoga penyampaian materi lebih baik dan deadline projectnya makin lama.',
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.black87,

@@ -1,9 +1,9 @@
-import 'package:latlong2/latlong.dart'; // 🔥 Perlu import ini
+import 'package:latlong2/latlong.dart';
 
 class CommunityModel {
   final int id;
   final String name;
-  final LatLng location; // Menggunakan LatLng dari latlong2
+  final LatLng location;
 
   CommunityModel({
     required this.id,
@@ -15,7 +15,6 @@ class CommunityModel {
     return CommunityModel(
       id: map['id'] as int,
       name: map['name'] as String,
-      // Mengonversi REAL (double) dari SQLite ke objek LatLng
       location: LatLng(map['latitude'] as double, map['longitude'] as double),
     );
   }

@@ -5,7 +5,6 @@ class NotificationService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
-  /// Inisialisasi notifikasi
   static Future<void> init() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -17,7 +16,6 @@ class NotificationService {
     tzdata.initializeTimeZones();
   }
 
-  /// Menampilkan notifikasi langsung (untuk testing manual)
   static Future<void> showNotification({
     required String title,
     required String body,

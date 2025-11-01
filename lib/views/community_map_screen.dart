@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
-import 'dart:async'; // Diperlukan untuk TimeoutException
+import 'dart:async';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/community_model.dart';
 import '../services/database_helper.dart';
 
-// Konstanta warna utama
 const Color _primaryColor = Color(0xFF7B1FA2);
 const Color _accentColor = Color(0xFFE53935);
 
@@ -19,45 +19,46 @@ class CommunityMapScreen extends StatefulWidget {
 
 class _CommunityMapScreenState extends State<CommunityMapScreen> {
   final DatabaseHelper dbHelper = DatabaseHelper();
-  // 🔥 MapController diinisialisasi secara late
   final MapController mapController = MapController();
 
   List<CommunityModel> _communityMarkers = [];
-  LatLng _currentLocation = const LatLng(-6.2088, 106.8456); // Default Jakarta
+  LatLng _currentLocation = const LatLng(-7.7785, 110.4075);
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    // Panggil fungsi utama untuk memuat data
     _loadMapData();
   }
 
-  // 🔥 FUNGSI UTAMA: Mengambil Lokasi Pengguna dan Data Komunitas
+  void _launchGoogleMaps(double lat, double lon) async {
+    final url = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$lat,$lon',
+    );
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal membuka Google Maps.')),
+      );
+    }
+  }
+
   Future<void> _loadMapData() async {
     Position? position;
 
     try {
-      // 1. Ambil Lokasi Pengguna (dengan timeout)
       position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.medium,
-      ).timeout(const Duration(seconds: 15)); // Timeout disini
-
-      // Izin lokasi diberikan dicetak di sini (log Anda sudah benar)
-      print('Izin lokasi diberikan ✅');
+      ).timeout(const Duration(seconds: 15));
     } on TimeoutException {
-      // Jika terjadi Timeout, biarkan position null dan gunakan lokasi default
-      print(
-        'Error loading map data: TimeoutException after 0:00:15.000000: Future not completed',
-      );
+      print('TimeoutException: Gagal mendapatkan lokasi GPS.');
       position = null;
     } catch (e) {
-      // Tangani error lainnya (Permission denied, service disabled, dll)
       print("Error loading map data: $e");
       position = null;
     }
 
-    // 2. Ambil Data Komunitas dari SQLite
     try {
       final List<Map<String, dynamic>> maps = await dbHelper
           .getAllCommunities();
@@ -75,9 +76,6 @@ class _CommunityMapScreenState extends State<CommunityMapScreen> {
         _isLoading = false;
       });
 
-      // 🔥 PERBAIKAN: Pindahkan pemindahan peta ke sini.
-      // Ini memastikan peta hanya dipindahkan setelah widget selesai di-build
-      // dan MapController siap.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         mapController.move(_currentLocation, 12.0);
       });
@@ -90,9 +88,7 @@ class _CommunityMapScreenState extends State<CommunityMapScreen> {
     }
   }
 
-  // 🔥 FUNGSI: Membangun Marker untuk Komunitas
   List<Marker> _buildMarkers() {
-    // ... (Logika marker sama) ...
     final communityMarkers = _communityMarkers.map((community) {
       return Marker(
         point: community.location,
@@ -122,24 +118,18 @@ class _CommunityMapScreenState extends State<CommunityMapScreen> {
       );
     }).toList();
 
-    // Tambahkan marker untuk lokasi pengguna saat ini
     communityMarkers.add(
       Marker(
         point: _currentLocation,
         width: 60,
         height: 60,
-        child: const Icon(
-          Icons.my_location,
-          color: _accentColor, // Warna aksen untuk lokasi sendiri
-          size: 30,
-        ),
+        child: const Icon(Icons.my_location, color: _accentColor, size: 30),
       ),
     );
 
     return communityMarkers;
   }
 
-  // 🔥 FUNGSI: Menampilkan detail komunitas saat marker diklik
   void _showCommunityDetails(BuildContext context, CommunityModel community) {
     showModalBottomSheet(
       context: context,
@@ -159,10 +149,35 @@ class _CommunityMapScreenState extends State<CommunityMapScreen> {
                 ),
               ),
               const Divider(),
-              Text('Latitude: ${community.location.latitude}'),
-              Text('Longitude: ${community.location.longitude}'),
-              const SizedBox(height: 10),
-              const Text('Bergabunglah dengan diskusi crypto terdekat!'),
+              Text(
+                'Latitude: ${community.location.latitude.toStringAsFixed(4)}',
+              ),
+              Text(
+                'Longitude: ${community.location.longitude.toStringAsFixed(4)}',
+              ),
+              const SizedBox(height: 20),
+
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context); // Tutup modal
+                  _launchGoogleMaps(
+                    community.location.latitude,
+                    community.location.longitude,
+                  );
+                },
+                icon: const Icon(Icons.near_me, color: Colors.white),
+                label: const Text(
+                  'Buka di Google Maps',
+                  style: TextStyle(color: Colors.white),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _accentColor,
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
             ],
           ),
         );
@@ -192,13 +207,10 @@ class _CommunityMapScreenState extends State<CommunityMapScreen> {
                 minZoom: 3.0,
               ),
               children: [
-                // 1. Layer Peta OpenStreetMap
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.example.project_mobile_crypto',
                 ),
-
-                // 2. Layer Marker Komunitas dan Lokasi User
                 MarkerLayer(markers: _buildMarkers()),
               ],
             ),

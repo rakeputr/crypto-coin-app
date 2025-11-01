@@ -18,7 +18,6 @@ class _TrendScreenState extends State<TrendScreen> {
   String _country = "Negara Tidak Dikenal";
   String _currency = "usd";
 
-  // Konstanta warna utama
   static const Color _primaryColor = Color(0xFF7B1FA2);
   static const Color _accentColor = Color(0xFFE53935);
 
@@ -71,7 +70,6 @@ class _TrendScreenState extends State<TrendScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      // Tangani error, misal timeout atau rate limiting
       String errorMsg = e.toString().contains('429')
           ? "Terlalu banyak permintaan (429). Coba lagi nanti."
           : "Gagal mengambil lokasi atau data.";
@@ -94,9 +92,7 @@ class _TrendScreenState extends State<TrendScreen> {
         children: [
           _buildGradientHeaderCard(topPadding),
           Padding(
-            padding: EdgeInsets.only(
-              top: topPadding + 110,
-            ), // Disesuaikan sedikit
+            padding: EdgeInsets.only(top: topPadding + 110),
             child: _isLoading
                 ? const Center(
                     child: CircularProgressIndicator(color: _primaryColor),
@@ -136,7 +132,6 @@ class _TrendScreenState extends State<TrendScreen> {
                                     'Harga: ${_currency.toUpperCase()} ${coin.currentPrice.toStringAsFixed(2)} | 24h: ${coin.priceChangePercentage24h.toStringAsFixed(2)}%',
                                 imageUrl: coin.image,
                                 isUp: coin.priceChangePercentage24h >= 0,
-                                // 🔥🔥 HAPUS FUNGSI ONTAP
                                 onTap: () {},
                               );
                             },
@@ -202,13 +197,11 @@ class _TrendScreenState extends State<TrendScreen> {
     );
   }
 
-  // 🔥 Fungsi ini diubah agar onTap bisa menjadi VoidCallback (opsional) atau diabaikan
   Widget _buildCryptoCard({
     required String title,
     required String subtitle,
     required String imageUrl,
     required bool isUp,
-    // 🔥 Ubah tipe data onTap dari required VoidCallback menjadi VoidCallback?
     VoidCallback? onTap,
   }) {
     return Card(

@@ -3,34 +3,29 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
 class DatabaseHelper {
-  // Singleton pattern
   static final DatabaseHelper _instance = DatabaseHelper._internal();
   factory DatabaseHelper() => _instance;
   DatabaseHelper._internal();
 
   static Database? _database;
 
-  // ==== USERS TABLE ====
   static const String userTable = 'users';
   static const String columnId = 'id';
   static const String columnFullName = 'fullName';
   static const String columnEmail = 'email';
   static const String columnPassword = 'password';
 
-  // ==== FAVORITES TABLE ====
   static const String favTable = 'favorites';
   static const String favId = 'id';
   static const String favUserId = 'userId';
   static const String favCoinId = 'coinId';
 
-  // ==== COMMUNITIES TABLE ====
   static const String commTable = 'communities';
   static const String commId = 'id';
   static const String commName = 'name';
-  static const String commLat = 'latitude'; // REAL untuk double
-  static const String commLon = 'longitude'; // REAL untuk double
+  static const String commLat = 'latitude';
+  static const String commLon = 'longitude';
 
-  // ===== INIT DATABASE =====
   Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDatabase();
@@ -43,28 +38,26 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      // Versi dinaikkan ke 4 untuk memicu _onUpgrade jika diperlukan
       version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
   }
 
-  // Fungsi untuk memasukkan dummy data komunitas di Yogyakarta
   Future<void> _insertYogyaDummyData(Database db) async {
     await db.insert(commTable, {
       commName: 'Komunitas NFT UPN "Veteran" YK',
-      commLat: -7.7785, // Di dalam area kampus
+      commLat: -7.7785,
       commLon: 110.4075,
     });
     await db.insert(commTable, {
       commName: 'Warung Kopi & Diskusi Blockchain (Seturan)',
-      commLat: -7.7720, // Sekitar Seturan
+      commLat: -7.7720,
       commLon: 110.4020,
     });
     await db.insert(commTable, {
       commName: 'Grup Trading Harian Jogja',
-      commLat: -7.7850, // Sekitar Babarsari
+      commLat: -7.7850,
       commLon: 110.4150,
     });
     await db.insert(commTable, {
@@ -75,7 +68,6 @@ class DatabaseHelper {
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    // 1. Create users table
     await db.execute('''
       CREATE TABLE $userTable (
         $columnId INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,7 +77,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // 2. Create favorites table
     await db.execute('''
       CREATE TABLE $favTable (
         $favId INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -94,7 +85,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // 3. Create communities table
     await db.execute('''
       CREATE TABLE $commTable (
         $commId INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -104,12 +94,10 @@ class DatabaseHelper {
       )
     ''');
 
-    // Panggil fungsi untuk memasukkan data dummy Jogja
     await _insertYogyaDummyData(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Jika upgrade dari versi lama (< 2), buat tabel favorites
     if (oldVersion < 2) {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS $favTable (
@@ -119,7 +107,6 @@ class DatabaseHelper {
         )
       ''');
     }
-    // Jika upgrade dari versi lama (< 3), buat tabel communities
     if (oldVersion < 3) {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS $commTable (
@@ -130,17 +117,12 @@ class DatabaseHelper {
         )
       ''');
     }
-    // Jika database di-upgrade ke versi 4 (untuk memastikan data default baru masuk)
     if (newVersion >= 4) {
-      // Hapus data lama komunitas (jika ada) dan masukkan data Yogyakarta yang baru
       await db.delete(commTable);
       await _insertYogyaDummyData(db);
     }
   }
 
-  // ==========================
-  // ==== USER FUNCTIONS ======
-  // ==========================
   Future<int> registerUser(User user) async {
     final db = await database;
     try {
@@ -205,10 +187,6 @@ class DatabaseHelper {
     });
   }
 
-  // ===============================
-  // ==== FAVORITE COINS SECTION ===
-  // ===============================
-
   Future<void> addFavorite(String userId, String coinId) async {
     final db = await database;
     await db.insert(favTable, {
@@ -244,10 +222,6 @@ class DatabaseHelper {
       whereArgs: [userId],
     );
   }
-
-  // ===============================
-  // ==== COMMUNITY FUNCTIONS ====
-  // ===============================
 
   Future<List<Map<String, dynamic>>> getAllCommunities() async {
     final db = await database;

@@ -314,8 +314,8 @@ class _DetailScreenState extends State<DetailScreen> {
             const SizedBox(width: 10),
             Flexible(
               child: Text(
-                widget.coin.name, // Judul Coin
-                textAlign: TextAlign.center, // Opsional: Judul tetap di tengah
+                widget.coin.name,
+                textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
@@ -359,8 +359,6 @@ class _DetailScreenState extends State<DetailScreen> {
       ],
     );
   }
-
-  // ... (Widget _buildKeyStatsCard, _buildStatItem, _buildExpandableCurrencyRow, _buildExpandableTimeRow, _buildDetailRow tetap sama) ...
 
   Widget _buildKeyStatsCard() {
     final usdCurrency = allCurrencies.firstWhere((c) => c.code == 'USD');
@@ -560,7 +558,6 @@ class _DetailScreenState extends State<DetailScreen> {
   }) {
     if (!isTwoLineFormat) {
       return Container(
-        // Style untuk Simbol dan Konversi (Horizontal)
         margin: _isCurrencyExpanded || _isTimeExpanded
             ? const EdgeInsets.only(bottom: 0)
             : const EdgeInsets.only(bottom: 10),
@@ -597,7 +594,6 @@ class _DetailScreenState extends State<DetailScreen> {
     }
 
     return Container(
-      // Style untuk Zona Waktu (Vertikal/Dua Baris)
       margin: const EdgeInsets.only(bottom: 0),
       padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
       decoration: const BoxDecoration(color: Colors.white),

@@ -6,7 +6,6 @@ import '../services/database_helper.dart';
 import 'detail_screen.dart';
 import 'package:intl/intl.dart';
 
-// Konstanta warna utama
 const Color _primaryColor = Color(0xFF7B1FA2);
 const Color _accentColor = Color(0xFFE53935);
 
@@ -25,22 +24,18 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
   @override
   void initState() {
     super.initState();
-    // Panggil refresh data saat inisialisasi
     _favoriteCoinsFuture = _fetchFavorites();
   }
 
-  // 🔥 Fungsi untuk mengambil semua data koin dan memfilternya berdasarkan favorit
   Future<List<CoinModel>> _fetchFavorites() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('userId');
 
     if (userId == null) {
-      // Jika belum login, kembalikan daftar kosong
       return [];
     }
     _currentUserId = userId;
 
-    // 1. Ambil daftar ID koin yang difavoritkan dari SQLite
     final favMaps = await dbHelper.getFavorites(userId);
     final Set<String> favoriteCoinIds = favMaps
         .map((map) => map['coinId'] as String)
@@ -50,10 +45,8 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
       return [];
     }
 
-    // 2. Ambil daftar koin global dari API CoinGecko
     final allCoins = await CoinService().fetchCoins();
 
-    // 3. Filter koin global hanya yang ada di daftar favorit
     final favoriteCoins = allCoins.where((coin) {
       return favoriteCoinIds.contains(coin.id);
     }).toList();
@@ -61,13 +54,11 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
     return favoriteCoins;
   }
 
-  // Helper untuk format mata uang
   String _formatCurrency(double amount) {
     final format = NumberFormat.currency(locale: 'en_US', symbol: '\$');
     return format.format(amount);
   }
 
-  // 🔥 Fungsi untuk refresh data saat kembali dari DetailScreen
   void _refreshFavorites() {
     setState(() {
       _favoriteCoinsFuture = _fetchFavorites();
@@ -76,8 +67,6 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Karena FavoriteScreen ada di BottomNav, kita TIDAK perlu Gradient Header Card
-    // Kita akan gunakan AppBar standar dari MainAppScreen (yang sudah Anda atur)
     return Scaffold(
       backgroundColor: Colors.grey[50],
 
@@ -97,7 +86,6 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
           children: <Widget>[
             const SizedBox(height: 20),
 
-            // FutureBuilder untuk menampilkan daftar favorit
             Expanded(
               child: FutureBuilder<List<CoinModel>>(
                 future: _favoriteCoinsFuture,
@@ -126,7 +114,6 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                     final favoriteCoins = snapshot.data!;
                     return ListView.builder(
                       itemCount: favoriteCoins.length,
-                      // Tambahkan padding di bawah agar tidak tertutup BottomNav
                       padding: const EdgeInsets.only(bottom: 20),
                       itemBuilder: (context, index) {
                         final coin = favoriteCoins[index];
@@ -134,14 +121,12 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                           context,
                           coin: coin,
                           onTap: () async {
-                            // Navigasi ke detail dan tunggu (await) sampai kembali
                             await Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => DetailScreen(coin: coin),
                               ),
                             );
-                            // 🔥 Refresh list setelah kembali (untuk melihat perubahan favorite)
                             _refreshFavorites();
                           },
                         );
@@ -157,7 +142,6 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
     );
   }
 
-  // Widget Pembantu untuk Data Card Crypto (diambil dari HomeScreen)
   Widget _buildCryptoCard(
     BuildContext context, {
     required CoinModel coin,

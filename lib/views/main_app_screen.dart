@@ -36,11 +36,10 @@ class _MainAppScreenState extends State<MainAppScreen> {
       body: Center(child: _widgetOptions.elementAt(_selectedIndex)),
 
       bottomNavigationBar: BottomNavigationBar(
-        // 🔥 Daftar Item sekarang memiliki 4 item
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Beranda'),
           BottomNavigationBarItem(
-            icon: Icon(Icons.favorite), // 🔥 Ikon Favorite
+            icon: Icon(Icons.favorite),
             label: 'Favorite',
           ),
           BottomNavigationBarItem(

@@ -22,6 +22,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _setSessionAndNavigate(User user) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('userId', user.id.toString());
+    await prefs.setString('fullName', user.fullName);
 
     Navigator.pushReplacementNamed(context, '/main');
   }
