@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:project_crypto_app/models/coin_model.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../services/database_helper.dart';
+import '../services/notification_service.dart';
 
+// Konstanta warna utama
 const Color _primaryColor = Color(0xFF7B1FA2);
 const Color _accentColor = Color(0xFFE53935);
 
+// Struktur data untuk Timezone
 class TimeZoneData {
   final String label;
   final String offset;
@@ -13,6 +18,7 @@ class TimeZoneData {
   const TimeZoneData(this.label, this.offset);
 }
 
+// Struktur data untuk Mata Uang
 class CurrencyData {
   final String code;
   final String symbol;
@@ -22,6 +28,7 @@ class CurrencyData {
   const CurrencyData(this.code, this.symbol, this.exchangeRate, this.locale);
 }
 
+// Daftar zona waktu yang tersedia
 const List<TimeZoneData> allTimeZones = [
   TimeZoneData('WIB (Jakarta)', '+0700'),
   TimeZoneData('WITA (Bali)', '+0800'),
@@ -29,6 +36,7 @@ const List<TimeZoneData> allTimeZones = [
   TimeZoneData('London (BST)', '+0100'),
 ];
 
+// Daftar mata uang yang tersedia
 const List<CurrencyData> allCurrencies = [
   CurrencyData('USD', '\$', 1.0, 'en_US'),
   CurrencyData('IDR', 'Rp', 16500.0, 'id_ID'),
@@ -45,19 +53,76 @@ class DetailScreen extends StatefulWidget {
 }
 
 class _DetailScreenState extends State<DetailScreen> {
+  // STATE untuk fitur favorite dan collapse
   bool _isTimeExpanded = false;
   bool _isCurrencyExpanded = false;
+
+  // STATE untuk status favorite dan ID Pengguna
+  bool _isFavorite = false;
+  String? _currentUserId;
+  final dbHelper = DatabaseHelper();
+
   @override
   void initState() {
     super.initState();
     initializeDateFormatting('id_ID', null);
+    _loadUserIdAndFavoriteStatus();
   }
 
-  String _formatCurrency(double amount, CurrencyData currency) {
-    final baseAmount =
-        amount / allCurrencies.firstWhere((c) => c.code == 'USD').exchangeRate;
+  // FUNGSI: Memuat ID pengguna dan status favorite
+  void _loadUserIdAndFavoriteStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('userId');
 
-    final convertedAmount = baseAmount * currency.exchangeRate;
+    if (userId != null) {
+      final isFav = await dbHelper.isFavorite(userId, widget.coin.id);
+      if (mounted) {
+        setState(() {
+          _currentUserId = userId;
+          _isFavorite = isFav;
+        });
+      }
+    }
+  }
+
+  // FUNGSI: Toggle status favorite dan Kirim Notifikasi
+  void _toggleFavorite() async {
+    if (_currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Anda harus login untuk menambah ke favorit.'),
+        ),
+      );
+      return;
+    }
+
+    final coinId = widget.coin.id;
+    String notificationBody = '';
+
+    if (_isFavorite) {
+      await dbHelper.removeFavorite(_currentUserId!, coinId);
+      notificationBody = '${widget.coin.name} telah dihapus dari Favorit.';
+    } else {
+      await dbHelper.addFavorite(_currentUserId!, coinId);
+      notificationBody = '${widget.coin.name} telah ditambahkan ke Favorit!';
+    }
+
+    if (mounted) {
+      setState(() {
+        _isFavorite = !_isFavorite;
+      });
+
+      // KIRIM NOTIFIKASI LOKAL
+      NotificationService.showNotification(
+        title: 'Perubahan Daftar Favorit',
+        body: notificationBody,
+      );
+    }
+  }
+
+  // Helper untuk format mata uang USD
+  String _formatCurrency(double amount, CurrencyData currency) {
+    final convertedAmount = amount * currency.exchangeRate;
 
     final format = NumberFormat.currency(
       locale: currency.locale,
@@ -66,20 +131,20 @@ class _DetailScreenState extends State<DetailScreen> {
     return format.format(convertedAmount);
   }
 
+  // Helper untuk format persentase
   String _formatPercentage(double percentage) {
     return '${percentage.toStringAsFixed(2)}%';
   }
 
+  // Helper yang mengembalikan string waktu lengkap
   String _formatDateTimeWithTimeZone(String isoString, String offset) {
     try {
       final dateTime = DateTime.parse(isoString);
-
       final hourOffset = int.parse(offset.substring(0, 3));
       final minuteOffset = int.parse(offset.substring(3, 5));
       final offsetDuration = Duration(hours: hourOffset, minutes: minuteOffset);
       final localTime = dateTime.add(offsetDuration);
       final formatter = DateFormat('dd MMM yyyy HH:mm:ss');
-
       return formatter.format(localTime);
     } catch (e) {
       return "Waktu tidak valid";
@@ -98,6 +163,7 @@ class _DetailScreenState extends State<DetailScreen> {
         backgroundColor: _primaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
+        // 🔥 HAPUS: actions: [...]
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
@@ -105,18 +171,27 @@ class _DetailScreenState extends State<DetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             _buildPriceHeader(),
-            const SizedBox(height: 30),
+
+            // 🔥 TAMBAHKAN: Tombol Love di sini
+            _buildFavoriteButton(),
+
+            const SizedBox(height: 20),
 
             _buildKeyStatsCard(),
             const SizedBox(height: 20),
+
+            // --- DETAIL TAMBAHAN ---
+
+            // 1. Simbol (Format satu baris)
             _buildDetailRow(
               'Simbol',
               widget.coin.symbol.toUpperCase(),
               icon: Icons.sell_outlined,
               isTwoLineFormat: false,
             ),
-            _buildExpandableCurrencyRow(),
 
+            // 2. Konversi Mata Uang
+            _buildExpandableCurrencyRow(),
             AnimatedCrossFade(
               duration: const Duration(milliseconds: 300),
               crossFadeState: _isCurrencyExpanded
@@ -142,6 +217,7 @@ class _DetailScreenState extends State<DetailScreen> {
               secondChild: const SizedBox.shrink(),
             ),
 
+            // 3. Zona Waktu
             _buildExpandableTimeRow(),
 
             AnimatedCrossFade(
@@ -174,10 +250,51 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
+  // 🔥 WIDGET BARU: Tombol Favorite yang dipindahkan
+  Widget _buildFavoriteButton() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 10.0),
+      child: Center(
+        child: InkWell(
+          onTap: _toggleFavorite,
+          borderRadius: BorderRadius.circular(50),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            decoration: BoxDecoration(
+              color: _isFavorite ? _accentColor.withOpacity(0.1) : Colors.white,
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: _accentColor, width: 1.5),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _isFavorite ? Icons.favorite : Icons.favorite_border,
+                  color: _accentColor,
+                  size: 24,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _isFavorite ? 'DI FAVORIT' : 'TAMBAH KE FAVORIT',
+                  style: const TextStyle(
+                    color: _accentColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildPriceHeader() {
     final isPositive = widget.coin.priceChangePercentage24h >= 0;
     final color = isPositive ? Colors.green.shade700 : _accentColor;
     final icon = isPositive ? Icons.arrow_upward : Icons.arrow_downward;
+    final usdCurrency = allCurrencies.firstWhere((c) => c.code == 'USD');
 
     return Column(
       children: [
@@ -195,12 +312,15 @@ class _DetailScreenState extends State<DetailScreen> {
               ),
             ),
             const SizedBox(width: 10),
-            Text(
-              widget.coin.name,
-              style: const TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: _primaryColor,
+            Flexible(
+              child: Text(
+                widget.coin.name, // Judul Coin
+                textAlign: TextAlign.center, // Opsional: Judul tetap di tengah
+                style: const TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: _primaryColor,
+                ),
               ),
             ),
           ],
@@ -208,10 +328,7 @@ class _DetailScreenState extends State<DetailScreen> {
         const SizedBox(height: 10),
 
         Text(
-          _formatCurrency(
-            widget.coin.currentPrice,
-            allCurrencies.firstWhere((c) => c.code == 'USD'),
-          ),
+          _formatCurrency(widget.coin.currentPrice, usdCurrency),
           style: const TextStyle(
             fontSize: 48,
             fontWeight: FontWeight.w900,
@@ -243,7 +360,10 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
+  // ... (Widget _buildKeyStatsCard, _buildStatItem, _buildExpandableCurrencyRow, _buildExpandableTimeRow, _buildDetailRow tetap sama) ...
+
   Widget _buildKeyStatsCard() {
+    final usdCurrency = allCurrencies.firstWhere((c) => c.code == 'USD');
     return Card(
       elevation: 5,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -254,30 +374,21 @@ class _DetailScreenState extends State<DetailScreen> {
             _buildStatItem(
               Icons.trending_up,
               'Harga Tertinggi (24j)',
-              _formatCurrency(
-                widget.coin.high24h,
-                allCurrencies.firstWhere((c) => c.code == 'USD'),
-              ),
+              _formatCurrency(widget.coin.high24h, usdCurrency),
               Colors.green,
             ),
             const Divider(),
             _buildStatItem(
               Icons.trending_down,
               'Harga Terendah (24j)',
-              _formatCurrency(
-                widget.coin.low24h,
-                allCurrencies.firstWhere((c) => c.code == 'USD'),
-              ),
+              _formatCurrency(widget.coin.low24h, usdCurrency),
               _accentColor,
             ),
             const Divider(),
             _buildStatItem(
               Icons.query_stats,
               'Kapitalisasi Pasar',
-              _formatCurrency(
-                widget.coin.marketCap,
-                allCurrencies.firstWhere((c) => c.code == 'USD'),
-              ),
+              _formatCurrency(widget.coin.marketCap, usdCurrency),
               _primaryColor,
             ),
           ],
@@ -321,10 +432,15 @@ class _DetailScreenState extends State<DetailScreen> {
     );
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 0),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: _isCurrencyExpanded
+            ? const BorderRadius.only(
+                topLeft: Radius.circular(10),
+                topRight: Radius.circular(10),
+              )
+            : BorderRadius.circular(10),
         border: Border.all(color: Colors.grey.shade200),
       ),
       child: InkWell(
@@ -383,6 +499,12 @@ class _DetailScreenState extends State<DetailScreen> {
       margin: const EdgeInsets.only(bottom: 0),
       decoration: BoxDecoration(
         color: Colors.white,
+        borderRadius: _isTimeExpanded
+            ? const BorderRadius.only(
+                topLeft: Radius.circular(10),
+                topRight: Radius.circular(10),
+              )
+            : BorderRadius.circular(10),
         border: Border.all(color: Colors.grey.shade200),
       ),
       child: InkWell(
@@ -438,14 +560,17 @@ class _DetailScreenState extends State<DetailScreen> {
   }) {
     if (!isTwoLineFormat) {
       return Container(
-        margin: isTwoLineFormat
+        // Style untuk Simbol dan Konversi (Horizontal)
+        margin: _isCurrencyExpanded || _isTimeExpanded
             ? const EdgeInsets.only(bottom: 0)
             : const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: isTwoLineFormat ? null : BorderRadius.circular(10),
-          border: isTwoLineFormat
+          borderRadius: _isCurrencyExpanded || _isTimeExpanded
+              ? null
+              : BorderRadius.circular(10),
+          border: _isCurrencyExpanded || _isTimeExpanded
               ? null
               : Border.all(color: Colors.grey.shade200),
         ),
@@ -472,6 +597,7 @@ class _DetailScreenState extends State<DetailScreen> {
     }
 
     return Container(
+      // Style untuk Zona Waktu (Vertikal/Dua Baris)
       margin: const EdgeInsets.only(bottom: 0),
       padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
       decoration: const BoxDecoration(color: Colors.white),

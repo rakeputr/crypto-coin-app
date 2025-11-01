@@ -39,20 +39,20 @@ class NotificationService {
   }
 
   /// Menjadwalkan notifikasi harian otomatis
-  static Future<void> scheduleDailyNotification() async {
-    await _notificationsPlugin.show(
-      1,
-      'Pengingat Market Crypto',
-      'Cek update harga terbaru hari ini!',
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'daily_channel',
-          'Daily Reminder',
-          channelDescription: 'Notifikasi harian untuk cek market crypto',
-          importance: Importance.max,
-          priority: Priority.high,
-        ),
-      ),
-    );
-  }
+  // static Future<void> scheduleDailyNotification() async {
+  //   await _notificationsPlugin.show(
+  //     1,
+  //     'Pengingat Market Crypto',
+  //     'Cek update harga terbaru hari ini!',
+  //     const NotificationDetails(
+  //       android: AndroidNotificationDetails(
+  //         'daily_channel',
+  //         'Daily Reminder',
+  //         channelDescription: 'Notifikasi harian untuk cek market crypto',
+  //         importance: Importance.max,
+  //         priority: Priority.high,
+  //       ),
+  //     ),
+  //   );
+  // }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:project_crypto_app/views/home_screen.dart';
+import 'package:project_crypto_app/views/favorite_screen.dart'; // 🔥 Import FavoriteScreen
 import 'package:project_crypto_app/views/trend_screen.dart';
 import 'package:project_crypto_app/views/user_screen.dart';
 
@@ -15,10 +16,12 @@ class _MainAppScreenState extends State<MainAppScreen> {
 
   static const Color _primaryColor = Color(0xFF7B1FA2);
 
+  // 🔥 Daftar widget sekarang memiliki 4 item (Favorite disisipkan)
   final List<Widget> _widgetOptions = <Widget>[
-    const HomeScreen(),
-    const TrendScreen(),
-    const UserScreen(),
+    const HomeScreen(), // Index 0: Beranda
+    const FavoriteScreen(), // Index 1: Favorite (Baru)
+    const TrendScreen(), // Index 2: Trend (Bergeser)
+    const UserScreen(), // Index 3: Profil (Bergeser)
   ];
 
   void _onItemTapped(int index) {
@@ -33,8 +36,13 @@ class _MainAppScreenState extends State<MainAppScreen> {
       body: Center(child: _widgetOptions.elementAt(_selectedIndex)),
 
       bottomNavigationBar: BottomNavigationBar(
+        // 🔥 Daftar Item sekarang memiliki 4 item
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Beranda'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite), // 🔥 Ikon Favorite
+            label: 'Favorite',
+          ),
           BottomNavigationBarItem(
             icon: Icon(Icons.trending_up),
             label: 'Trend',

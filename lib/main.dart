@@ -46,7 +46,7 @@ Future<void> main() async {
   isUserLoggedIn = prefs.getString('userId')?.isNotEmpty ?? false;
 
   await NotificationService.init();
-  await NotificationService.scheduleDailyNotification();
+  // await NotificationService.scheduleDailyNotification();
 
   await _initLocation();
 
