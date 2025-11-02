@@ -31,7 +31,7 @@ class CoinService {
       }
     } on SocketException catch (e) {
       throw Exception(
-        "Gagal koneksi ke server. Pastikan internet Anda stabil.",
+        "Gagal koneksi ke server. Pastikan internet Anda stabil. $e",
       );
     } catch (e) {
       throw Exception("Terjadi kesalahan tak terduga saat mengambil data: $e");
