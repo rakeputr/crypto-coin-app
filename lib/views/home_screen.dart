@@ -69,7 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final topPadding = mediaQuery.padding.top;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey[50],
       body: Stack(
         children: [
           _buildGradientHeaderCard(context, topPadding),
@@ -81,7 +81,53 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 } else if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
+                  final errorMsg = snapshot.error.toString();
+
+                  // Jika error 429 Too Many Requests
+                  if (errorMsg.contains('429')) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.error, color: Colors.red, size: 60),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'Terlalu banyak permintaan.\nSilakan coba lagi nanti.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          const SizedBox(height: 15),
+                          ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                futureCoins = CoinService().fetchCoins();
+                              });
+                            },
+                            child: const Text('Refresh'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  // Error lain
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('Error: $errorMsg'),
+                        const SizedBox(height: 10),
+                        ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              futureCoins = CoinService().fetchCoins();
+                            });
+                          },
+                          child: const Text('Coba Lagi'),
+                        ),
+                      ],
+                    ),
+                  );
                 } else {
                   if (allCoins.isEmpty) {
                     allCoins = snapshot.data!;
@@ -240,31 +286,94 @@ class _HomeScreenState extends State<HomeScreen> {
     required bool isUp,
     required VoidCallback onTap,
   }) {
-    return Card(
-      elevation: 5,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      margin: const EdgeInsets.only(bottom: 15),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.grey.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(10),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 15),
+
+        // OUTER: GRADIENT BORDER + SHADOW
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFF7B1FA2), // ungu
+              Color(0xFFE53935), // merah
+            ],
           ),
-          child: Image.network(imageUrl, width: 35, height: 35),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 8,
+              offset: Offset(0, 3),
+            ),
+          ],
         ),
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+
+        // PADDING UNTUK BORDER GRADIENT (PENTING!)
+        child: Container(
+          padding: const EdgeInsets.all(
+            2,
+          ), // <= INI YANG BIKIN GRADIENT KELIATAN
+
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+
+            // INNER WHITE CARD
+            decoration: BoxDecoration(
+              //ganti warna card disini
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+            ),
+
+            child: Row(
+              children: [
+                // ICON / IMAGE
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Image.network(imageUrl, width: 35, height: 35),
+                ),
+
+                const SizedBox(width: 14),
+
+                // TEXT
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Colors.black,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ICON UP/DOWN
+                Icon(
+                  isUp ? Icons.trending_up : Icons.trending_down,
+                  color: isUp ? Colors.green : Colors.red,
+                  size: 28,
+                ),
+              ],
+            ),
+          ),
         ),
-        subtitle: Text(subtitle),
-        trailing: Icon(
-          isUp ? Icons.trending_up : Icons.trending_down,
-          color: isUp ? Colors.green : Colors.red,
-          size: 28,
-        ),
-        onTap: onTap,
       ),
     );
   }

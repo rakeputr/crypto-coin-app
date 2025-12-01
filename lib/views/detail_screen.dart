@@ -362,34 +362,58 @@ class _DetailScreenState extends State<DetailScreen> {
 
   Widget _buildKeyStatsCard() {
     final usdCurrency = allCurrencies.firstWhere((c) => c.code == 'USD');
-    return Card(
-      elevation: 5,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          children: [
-            _buildStatItem(
-              Icons.trending_up,
-              'Harga Tertinggi (24j)',
-              _formatCurrency(widget.coin.high24h, usdCurrency),
-              Colors.green,
-            ),
-            const Divider(),
-            _buildStatItem(
-              Icons.trending_down,
-              'Harga Terendah (24j)',
-              _formatCurrency(widget.coin.low24h, usdCurrency),
-              _accentColor,
-            ),
-            const Divider(),
-            _buildStatItem(
-              Icons.query_stats,
-              'Kapitalisasi Pasar',
-              _formatCurrency(widget.coin.marketCap, usdCurrency),
-              _primaryColor,
-            ),
+
+    return Container(
+      margin: const EdgeInsets.only(top: 15),
+
+      // OUTER: GRADIENT BORDER + SHADOW
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF7B1FA2), // ungu
+            Color(0xFFE53935), // merah
           ],
+        ),
+        boxShadow: [
+          BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3)),
+        ],
+      ),
+
+      child: Container(
+        padding: const EdgeInsets.all(2), // membuat border terlihat
+        // INNER WHITE CARD
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          padding: const EdgeInsets.all(20),
+
+          child: Column(
+            children: [
+              _buildStatItem(
+                Icons.trending_up,
+                'Harga Tertinggi (24j)',
+                _formatCurrency(widget.coin.high24h, usdCurrency),
+                Colors.green,
+              ),
+              const Divider(),
+              _buildStatItem(
+                Icons.trending_down,
+                'Harga Terendah (24j)',
+                _formatCurrency(widget.coin.low24h, usdCurrency),
+                _accentColor,
+              ),
+              const Divider(),
+              _buildStatItem(
+                Icons.query_stats,
+                'Kapitalisasi Pasar',
+                _formatCurrency(widget.coin.marketCap, usdCurrency),
+                _primaryColor,
+              ),
+            ],
+          ),
         ),
       ),
     );

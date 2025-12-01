@@ -266,11 +266,13 @@ class _LoginScreenState extends State<LoginScreen> {
       height: 50.0,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30.0),
+        // ini kalo ganti warna
         gradient: const LinearGradient(
           colors: [Color(0xFF7B1FA2), Color(0xFFE53935)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
+        //
       ),
       child: Material(
         color: Colors.transparent,

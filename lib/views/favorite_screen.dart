@@ -152,10 +152,21 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
     final String formattedChange =
         '${coin.priceChangePercentage24h.toStringAsFixed(2)}%';
 
-    return Card(
-      elevation: 5,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+    return Container(
       margin: const EdgeInsets.only(bottom: 15),
+      decoration: BoxDecoration(
+        //ganti warna card disini
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.grey.shade300, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
         leading: Container(

@@ -16,27 +16,36 @@ class CoinService {
             const Duration(seconds: 15),
             onTimeout: () {
               throw const SocketException(
-                'Koneksi terputus: Waktu tunggu habis (Timeout).',
+                'Timeout: Koneksi terlalu lama tidak merespon.',
               );
             },
           );
+
+      // ---- ERROR HANDLING BARU ----
+      if (response.statusCode == 429) {
+        throw Exception("429: Too Many Requests");
+      }
 
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         return data.map((v) => CoinModel.fromJson(v)).toList();
       } else {
         throw Exception(
-          "Gagal fetch data dari API CoinGecko. Status: ${response.statusCode}",
+          "Error ${response.statusCode}: Gagal mengambil data dari API.",
         );
       }
-    } on SocketException catch (e) {
-      throw Exception(
-        "Gagal koneksi ke server. Pastikan internet Anda stabil. $e",
-      );
+    } on SocketException catch (_) {
+      throw Exception("Tidak ada koneksi internet.");
+    } on HttpException catch (_) {
+      throw Exception("Server tidak dapat diakses.");
+    } on FormatException catch (_) {
+      throw Exception("Format data dari server tidak valid.");
     } catch (e) {
-      throw Exception("Terjadi kesalahan tak terduga saat mengambil data: $e");
+      throw Exception("Error tidak diketahui: $e");
     }
   }
+
+  // ------------------ OPTIONAL FEATURE: BY COUNTRY ------------------
 
   String mapCountryToCurrency(String country) {
     final mapping = {
@@ -59,13 +68,26 @@ class CoinService {
     final vsCurrency = mapCountryToCurrency(country);
     final url = "$baseUrl/coins/markets?vs_currency=$vsCurrency";
 
-    final response = await http.get(Uri.parse(url));
+    try {
+      final response = await http
+          .get(Uri.parse(url))
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () => throw SocketException("Timeout"),
+          );
 
-    if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      return data.map((v) => CoinModel.fromJson(v)).toList();
-    } else {
-      throw Exception("Gagal fetch data untuk $country");
+      if (response.statusCode == 429) {
+        throw Exception("429: Too Many Requests");
+      }
+
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        return data.map((v) => CoinModel.fromJson(v)).toList();
+      } else {
+        throw Exception("Error ${response.statusCode}");
+      }
+    } catch (e) {
+      throw Exception("Terjadi error: $e");
     }
   }
 }
