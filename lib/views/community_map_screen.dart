@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:project_crypto_app/views/add_community_screen.dart';
+import 'package:project_crypto_app/views/community_detail_screen.dart';
 import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
-import '../models/community_model.dart';
 import '../services/database_helper.dart';
 
 const Color _primaryColor = Color(0xFF7B1FA2);
@@ -21,7 +22,7 @@ class _CommunityMapScreenState extends State<CommunityMapScreen> {
   final DatabaseHelper dbHelper = DatabaseHelper();
   final MapController mapController = MapController();
 
-  List<CommunityModel> _communityMarkers = [];
+  List<Map<String, dynamic>> _communities = [];
   LatLng _currentLocation = const LatLng(-7.7785, 110.4075);
   bool _isLoading = true;
 
@@ -45,6 +46,8 @@ class _CommunityMapScreenState extends State<CommunityMapScreen> {
   }
 
   Future<void> _loadMapData() async {
+    setState(() => _isLoading = true);
+
     Position? position;
 
     try {
@@ -60,11 +63,7 @@ class _CommunityMapScreenState extends State<CommunityMapScreen> {
     }
 
     try {
-      final List<Map<String, dynamic>> maps = await dbHelper
-          .getAllCommunities();
-      final List<CommunityModel> communities = maps
-          .map((map) => CommunityModel.fromMap(map))
-          .toList();
+      final communities = await dbHelper.getAllCommunities();
 
       if (!mounted) return;
 
@@ -72,7 +71,7 @@ class _CommunityMapScreenState extends State<CommunityMapScreen> {
         if (position != null) {
           _currentLocation = LatLng(position.latitude, position.longitude);
         }
-        _communityMarkers = communities;
+        _communities = communities;
         _isLoading = false;
       });
 
@@ -88,15 +87,40 @@ class _CommunityMapScreenState extends State<CommunityMapScreen> {
     }
   }
 
+  Future<void> _navigateToAddCommunity() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AddCommunityScreen()),
+    );
+
+    if (result == true) {
+      _loadMapData();
+    }
+  }
+
+  void _navigateToCommunityDetail(int communityId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CommunityDetailScreen(communityId: communityId),
+      ),
+    ).then((_) => _loadMapData());
+  }
+
   List<Marker> _buildMarkers() {
-    final communityMarkers = _communityMarkers.map((community) {
+    final communityMarkers = _communities.map((community) {
+      final location = LatLng(
+        community['latitude'] as double,
+        community['longitude'] as double,
+      );
+
       return Marker(
-        point: community.location,
+        point: location,
         width: 80,
         height: 80,
         child: GestureDetector(
           onTap: () {
-            _showCommunityDetails(context, community);
+            _showCommunityPreview(context, community);
           },
           child: Column(
             children: [
@@ -135,7 +159,7 @@ class _CommunityMapScreenState extends State<CommunityMapScreen> {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    community.name,
+                    community['name'] as String,
                     textAlign: TextAlign.center,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -178,7 +202,10 @@ class _CommunityMapScreenState extends State<CommunityMapScreen> {
     return communityMarkers;
   }
 
-  void _showCommunityDetails(BuildContext context, CommunityModel community) {
+  void _showCommunityPreview(
+    BuildContext context,
+    Map<String, dynamic> community,
+  ) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -211,20 +238,66 @@ class _CommunityMapScreenState extends State<CommunityMapScreen> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      community.name,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: _primaryColor,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          community['name'] as String,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: _primaryColor,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.group,
+                              size: 16,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${community['memberCount'] ?? 0} members',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+
+              if (community['description'] != null &&
+                  (community['description'] as String).isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    community['description'] as String,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.black87,
+                      height: 1.4,
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+
+              const SizedBox(height: 16),
+
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(12),
@@ -239,78 +312,99 @@ class _CommunityMapScreenState extends State<CommunityMapScreen> {
                           size: 20,
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          'Latitude: ${community.location.latitude.toStringAsFixed(4)}',
-                          style: TextStyle(color: Colors.grey.shade700),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on,
-                          color: Colors.grey.shade600,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Longitude: ${community.location.longitude.toStringAsFixed(4)}',
-                          style: TextStyle(color: Colors.grey.shade700),
+                        Expanded(
+                          child: Text(
+                            community['address'] as String? ??
+                                'Alamat tidak tersedia',
+                            style: TextStyle(color: Colors.grey.shade700),
+                          ),
                         ),
                       ],
                     ),
                   ],
                 ),
               ),
+
               const SizedBox(height: 20),
-              Container(
-                height: 55,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF7B1FA2), Color(0xFFE53935)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _secondaryColor.withOpacity(0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.pop(context);
-                      _launchGoogleMaps(
-                        community.location.latitude,
-                        community.location.longitude,
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(15),
-                    child: const Center(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.near_me, color: Colors.white, size: 24),
-                          SizedBox(width: 10),
-                          Text(
-                            'Buka di Google Maps',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 50,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF7B1FA2), Color(0xFFE53935)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _secondaryColor.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.pop(context);
+                            _navigateToCommunityDetail(community['id'] as int);
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: const Center(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.info, color: Colors.white, size: 20),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Lihat Detail',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  Container(
+                    height: 50,
+                    width: 50,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _primaryColor, width: 2),
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.pop(context);
+                          _launchGoogleMaps(
+                            community['latitude'] as double,
+                            community['longitude'] as double,
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: const Icon(
+                          Icons.directions,
+                          color: _primaryColor,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -325,7 +419,7 @@ class _CommunityMapScreenState extends State<CommunityMapScreen> {
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: const Text(
-          'Komunitas Crypto Terdekat',
+          'Komunitas Crypto',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         flexibleSpace: Container(
@@ -339,40 +433,145 @@ class _CommunityMapScreenState extends State<CommunityMapScreen> {
         ),
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_location_alt),
+            onPressed: _navigateToAddCommunity,
+            tooltip: 'Tambah Komunitas',
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: _primaryColor))
-          : FlutterMap(
-              mapController: mapController,
-              options: MapOptions(
-                initialCenter: _currentLocation,
-                initialZoom: 12.0,
-                maxZoom: 18.0,
-                minZoom: 3.0,
-              ),
+          : Stack(
               children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.example.project_mobile_crypto',
+                FlutterMap(
+                  mapController: mapController,
+                  options: MapOptions(
+                    initialCenter: _currentLocation,
+                    initialZoom: 12.0,
+                    maxZoom: 18.0,
+                    minZoom: 3.0,
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.example.project_mobile_crypto',
+                    ),
+                    MarkerLayer(markers: _buildMarkers()),
+                  ],
                 ),
-                MarkerLayer(markers: _buildMarkers()),
+                Positioned(
+                  top: 16,
+                  left: 16,
+                  right: 16,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.white.withOpacity(0.95),
+                          Colors.white.withOpacity(0.9),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF7B1FA2), Color(0xFFE53935)],
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.people_alt,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Total Komunitas',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Text(
+                                '${_communities.length} komunitas',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: _primaryColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _loadMapData,
-        child: Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF7B1FA2), Color(0xFFE53935)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            heroTag: 'add',
+            onPressed: _navigateToAddCommunity,
+            child: Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF7B1FA2), Color(0xFFE53935)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: const Icon(Icons.add, color: Colors.white, size: 28),
             ),
-            borderRadius: BorderRadius.circular(30),
           ),
-          child: const Icon(Icons.refresh, color: Colors.white),
-        ),
+          const SizedBox(height: 12),
+          FloatingActionButton(
+            heroTag: 'refresh',
+            onPressed: _loadMapData,
+            backgroundColor: Colors.white,
+            child: Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.refresh, color: _primaryColor),
+            ),
+          ),
+        ],
       ),
     );
   }
