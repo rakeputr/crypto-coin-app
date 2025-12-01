@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_map/flutter_map.dart';
 import '../services/database_helper.dart';
 
 const Color _primaryColor = Color(0xFF7B1FA2);
@@ -25,7 +26,6 @@ class _AddCommunityScreenState extends State<AddCommunityScreen> {
   LatLng? _selectedLocation;
   String _address = 'Pilih lokasi';
   bool _isLoadingLocation = false;
-  bool _useCurrentLocation = true;
 
   @override
   void dispose() {
@@ -79,15 +79,41 @@ class _AddCommunityScreenState extends State<AddCommunityScreen> {
         : 'Lokasi tidak diketahui';
   }
 
-  Future<void> _selectLocationManually() async {
-    // TODO: Implement map picker
-    // Untuk saat ini, gunakan lokasi default Yogyakarta
-    setState(() {
-      _selectedLocation = const LatLng(-7.7785, 110.4075);
-      _address = 'Yogyakarta (Dipilih manual)';
-    });
+  Future<void> _selectLocationOnMap() async {
+    final initialLocation =
+        _selectedLocation ?? const LatLng(-7.7785, 110.4075);
 
-    _showSnackBar('Fitur pilih di peta akan segera hadir!');
+    final result = await Navigator.push<LatLng>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MapPickerScreen(initialLocation: initialLocation),
+      ),
+    );
+
+    if (result != null) {
+      try {
+        List<Placemark> placemarks = await placemarkFromCoordinates(
+          result.latitude,
+          result.longitude,
+        );
+
+        setState(() {
+          _selectedLocation = result;
+          if (placemarks.isNotEmpty) {
+            _address = _formatAddress(placemarks.first);
+          } else {
+            _address =
+                'Lat: ${result.latitude.toStringAsFixed(4)}, Lon: ${result.longitude.toStringAsFixed(4)}';
+          }
+        });
+      } catch (e) {
+        setState(() {
+          _selectedLocation = result;
+          _address =
+              'Lat: ${result.latitude.toStringAsFixed(4)}, Lon: ${result.longitude.toStringAsFixed(4)}';
+        });
+      }
+    }
   }
 
   Future<void> _saveCommunity() async {
@@ -120,7 +146,7 @@ class _AddCommunityScreenState extends State<AddCommunityScreen> {
 
       if (communityId > 0) {
         _showSnackBar('Komunitas berhasil dibuat!');
-        Navigator.pop(context, true); // Return true to refresh list
+        Navigator.pop(context, true);
       } else {
         _showSnackBar('Gagal membuat komunitas');
       }
@@ -389,7 +415,7 @@ class _AddCommunityScreenState extends State<AddCommunityScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _selectLocationManually,
+                      onPressed: _selectLocationOnMap,
                       icon: const Icon(Icons.map, size: 20),
                       label: const Text('Pilih di Peta'),
                       style: OutlinedButton.styleFrom(
@@ -452,6 +478,133 @@ class _AddCommunityScreenState extends State<AddCommunityScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// Map Picker Screen
+class MapPickerScreen extends StatefulWidget {
+  final LatLng initialLocation;
+
+  const MapPickerScreen({super.key, required this.initialLocation});
+
+  @override
+  State<MapPickerScreen> createState() => _MapPickerScreenState();
+}
+
+class _MapPickerScreenState extends State<MapPickerScreen> {
+  late LatLng _selectedLocation;
+  final MapController _mapController = MapController();
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedLocation = widget.initialLocation;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Pilih Lokasi di Peta',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF7B1FA2), Color(0xFFE53935)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.check),
+            onPressed: () => Navigator.pop(context, _selectedLocation),
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: _selectedLocation,
+              initialZoom: 15.0,
+              onTap: (tapPosition, point) {
+                setState(() {
+                  _selectedLocation = point;
+                });
+              },
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.project_mobile_crypto',
+              ),
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: _selectedLocation,
+                    width: 60,
+                    height: 60,
+                    child: const Icon(
+                      Icons.location_on,
+                      color: Color(0xFFE53935),
+                      size: 60,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          Positioned(
+            bottom: 20,
+            left: 20,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Lokasi Terpilih:',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Lat: ${_selectedLocation.latitude.toStringAsFixed(6)}\nLon: ${_selectedLocation.longitude.toStringAsFixed(6)}',
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Tap pada peta untuk memilih lokasi',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../services/database_helper.dart';
 
 const Color _primaryColor = Color(0xFF7B1FA2);
 const Color _secondaryColor = Color(0xFFE53935);
-const Color _successColor = Color(0xFF26C281);
 
 class CommunityDetailScreen extends StatefulWidget {
   final int communityId;
@@ -20,6 +21,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
     with SingleTickerProviderStateMixin {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final TextEditingController _postController = TextEditingController();
+  final ImagePicker _imagePicker = ImagePicker();
 
   late TabController _tabController;
 
@@ -31,6 +33,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
   String? _currentUserName;
   bool _isMember = false;
   bool _isLoading = true;
+  File? _selectedImage;
 
   @override
   void initState() {
@@ -104,6 +107,25 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
     }
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        setState(() {
+          _selectedImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      _showSnackBar('Gagal memilih gambar: $e');
+    }
+  }
+
   Future<void> _createPost() async {
     if (_postController.text.trim().isEmpty) {
       _showSnackBar('Tulis sesuatu terlebih dahulu');
@@ -120,15 +142,20 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
       return;
     }
 
+    // Simpan path gambar jika ada
+    String? imagePath = _selectedImage?.path;
+
     final postId = await _dbHelper.createCommunityPost(
       communityId: widget.communityId,
       userId: _currentUserId!,
       userName: _currentUserName ?? 'User',
       content: _postController.text.trim(),
+      imageUrl: imagePath,
     );
 
     if (postId > 0) {
       _postController.clear();
+      setState(() => _selectedImage = null);
       _showSnackBar('Post berhasil dibuat!');
       _loadData();
       FocusScope.of(context).unfocus();
@@ -208,8 +235,11 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
   }
 
   Widget _buildAppBar() {
+    final description = _community!['description'] ?? '';
+    final hasLongDescription = description.length > 100;
+
     return SliverAppBar(
-      expandedHeight: 260,
+      expandedHeight: hasLongDescription ? 320 : 280,
       pinned: true,
       backgroundColor: _primaryColor,
       flexibleSpace: FlexibleSpaceBar(
@@ -229,6 +259,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
                         padding: const EdgeInsets.all(16),
@@ -251,10 +282,10 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
                               _community!['name'],
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 24,
+                                fontSize: 22,
                                 fontWeight: FontWeight.bold,
                               ),
-                              maxLines: 2,
+                              maxLines: 3,
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 6),
@@ -282,13 +313,13 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    _community!['description'] ?? '',
+                    description,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 14,
                       height: 1.4,
                     ),
-                    maxLines: 2,
+                    maxLines: hasLongDescription ? 4 : 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 16),
@@ -303,39 +334,25 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
   }
 
   Widget _buildJoinButton() {
-    return Container(
+    return SizedBox(
       width: double.infinity,
       height: 45,
-      decoration: BoxDecoration(
-        color: _isMember ? Colors.white.withOpacity(0.2) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: _toggleMembership,
-          borderRadius: BorderRadius.circular(12),
-          child: Center(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  _isMember ? Icons.check_circle : Icons.add_circle,
-                  color: _isMember ? Colors.white : _primaryColor,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  _isMember ? 'Member' : 'Bergabung',
-                  style: TextStyle(
-                    color: _isMember ? Colors.white : _primaryColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
+      child: ElevatedButton.icon(
+        onPressed: _toggleMembership,
+        icon: Icon(_isMember ? Icons.check_circle : Icons.add_circle, size: 20),
+        label: Text(
+          _isMember ? 'Member' : 'Bergabung',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _isMember
+              ? Colors.white.withOpacity(0.2)
+              : Colors.white,
+          foregroundColor: _isMember ? Colors.white : _primaryColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
+          elevation: 0,
         ),
       ),
     );
@@ -483,23 +500,28 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
                 color: Colors.black87,
               ),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.favorite_border),
-                  color: Colors.grey.shade600,
-                  onPressed: () async {
-                    await _dbHelper.likeCommunityPost(post['id']);
-                    _loadData();
-                  },
+            if (post['imageUrl'] != null && post['imageUrl'].isNotEmpty) ...[
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.file(
+                  File(post['imageUrl']),
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: 200,
+                    color: Colors.grey.shade200,
+                    child: Center(
+                      child: Icon(
+                        Icons.broken_image,
+                        color: Colors.grey.shade400,
+                        size: 48,
+                      ),
+                    ),
+                  ),
                 ),
-                Text(
-                  '${post['likeCount'] ?? 0}',
-                  style: TextStyle(color: Colors.grey.shade600),
-                ),
-              ],
-            ),
+              ),
+            ],
           ],
         ),
       ),
@@ -553,11 +575,14 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
               children: [
                 Row(
                   children: [
-                    Text(
-                      member['userName'],
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
+                    Flexible(
+                      child: Text(
+                        member['userName'],
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if (isAdmin) ...[
@@ -615,39 +640,83 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen>
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: TextField(
-              controller: _postController,
-              decoration: InputDecoration(
-                hintText: 'Tulis sesuatu...',
-                filled: true,
-                fillColor: Colors.grey.shade100,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(25),
-                  borderSide: BorderSide.none,
+          if (_selectedImage != null) ...[
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.file(
+                    _selectedImage!,
+                    height: 150,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
                 ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedImage = null),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+          Row(
+            children: [
+              IconButton(
+                icon: Icon(Icons.image, color: _primaryColor),
+                onPressed: _pickImage,
+              ),
+              Expanded(
+                child: TextField(
+                  controller: _postController,
+                  decoration: InputDecoration(
+                    hintText: 'Tulis sesuatu...',
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(25),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                  ),
+                  maxLines: null,
                 ),
               ),
-              maxLines: null,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF7B1FA2), Color(0xFFE53935)],
+              const SizedBox(width: 12),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF7B1FA2), Color(0xFFE53935)],
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  onPressed: _createPost,
+                  icon: const Icon(Icons.send, color: Colors.white),
+                ),
               ),
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              onPressed: _createPost,
-              icon: const Icon(Icons.send, color: Colors.white),
-            ),
+            ],
           ),
         ],
       ),
