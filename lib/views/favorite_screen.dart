@@ -6,7 +6,7 @@ import '../services/favorite_service.dart';
 import 'detail_screen.dart';
 import 'package:intl/intl.dart';
 
-const Color _primaryColor = Color(0xFF6C63FF);
+const Color _primaryColor = Color(0xFF7B1FA2);
 const Color _successColor = Color(0xFF26C281);
 const Color _dangerColor = Color(0xFFEF4444);
 
@@ -104,7 +104,7 @@ class _FavoriteScreenState extends State<FavoriteScreen>
     super.build(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: Colors.grey[50],
       body: CustomScrollView(
         slivers: [
           _buildModernAppBar(),
@@ -130,9 +130,9 @@ class _FavoriteScreenState extends State<FavoriteScreen>
         background: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
+              colors: [Color(0xFF7B1FA2), Color(0xFFE53935)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFF6C63FF), Color(0xFF5A52D5)],
             ),
           ),
           child: SafeArea(
@@ -377,16 +377,27 @@ class _FavoriteScreenState extends State<FavoriteScreen>
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
-                    color: _primaryColor.withOpacity(0.1),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF7B1FA2), Color(0xFFE53935)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  padding: const EdgeInsets.all(10),
-                  child: Image.network(
-                    coin.image,
-                    errorBuilder: (context, error, stackTrace) => const Icon(
-                      Icons.currency_bitcoin,
-                      size: 28,
-                      color: _primaryColor,
+                  padding: const EdgeInsets.all(2),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    child: Image.network(
+                      coin.image,
+                      errorBuilder: (context, error, stackTrace) => const Icon(
+                        Icons.currency_bitcoin,
+                        size: 28,
+                        color: _primaryColor,
+                      ),
                     ),
                   ),
                 ),

@@ -4,6 +4,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/coin_model.dart';
 import '../services/coin_cache_service.dart';
 
+const Color _primaryColor = Color(0xFF7B1FA2);
+const Color _secondaryColor = Color(0xFFE53935);
+const Color _successColor = Color(0xFF26C281);
+const Color _dangerColor = Color(0xFFEF4444);
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -101,10 +106,10 @@ class _HomeScreenState extends State<HomeScreen>
     super.build(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: Colors.grey[50],
       body: RefreshIndicator(
         onRefresh: () => _fetchCoins(forceRefresh: true),
-        color: const Color(0xFF6C63FF),
+        color: _primaryColor,
         child: CustomScrollView(
           slivers: [
             _buildModernAppBar(),
@@ -120,14 +125,14 @@ class _HomeScreenState extends State<HomeScreen>
       expandedHeight: 200,
       floating: false,
       pinned: true,
-      backgroundColor: const Color(0xFF6C63FF),
+      backgroundColor: _primaryColor,
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
+              colors: [Color(0xFF7B1FA2), Color(0xFFE53935)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [const Color(0xFF6C63FF), const Color(0xFF5A52D5)],
             ),
           ),
           child: SafeArea(
@@ -268,7 +273,7 @@ class _HomeScreenState extends State<HomeScreen>
         height: 400,
         child: const Center(
           child: CircularProgressIndicator(
-            color: Color(0xFF6C63FF),
+            color: _primaryColor,
             strokeWidth: 3,
           ),
         ),
@@ -284,12 +289,12 @@ class _HomeScreenState extends State<HomeScreen>
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
+                color: _secondaryColor.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.error_outline,
-                color: Colors.red.shade400,
+                color: _secondaryColor,
                 size: 48,
               ),
             ),
@@ -309,7 +314,7 @@ class _HomeScreenState extends State<HomeScreen>
               icon: const Icon(Icons.refresh, size: 20),
               label: const Text('Try Again'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6C63FF),
+                backgroundColor: _primaryColor,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 32,
@@ -348,14 +353,14 @@ class _HomeScreenState extends State<HomeScreen>
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF6C63FF).withOpacity(0.1),
+                  color: _primaryColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   '${_filteredCoins.length} coins',
                   style: const TextStyle(
                     fontSize: 13,
-                    color: Color(0xFF6C63FF),
+                    color: _primaryColor,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -402,9 +407,7 @@ class _ModernCryptoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUp = coin.priceChangePercentage24h >= 0;
-    final changeColor = isUp
-        ? const Color(0xFF26C281)
-        : const Color(0xFFEF4444);
+    final changeColor = isUp ? _successColor : _dangerColor;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -427,16 +430,27 @@ class _ModernCryptoCard extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF6C63FF).withOpacity(0.1),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF7B1FA2), Color(0xFFE53935)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  padding: const EdgeInsets.all(8),
-                  child: Image.network(
-                    coin.image,
-                    errorBuilder: (_, __, ___) => const Icon(
-                      Icons.currency_bitcoin,
-                      size: 28,
-                      color: Color(0xFF6C63FF),
+                  padding: const EdgeInsets.all(2),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.all(6),
+                    child: Image.network(
+                      coin.image,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.currency_bitcoin,
+                        size: 24,
+                        color: _primaryColor,
+                      ),
                     ),
                   ),
                 ),

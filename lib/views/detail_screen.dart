@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/favorite_service.dart';
 import '../services/notification_service.dart';
 
-const Color _primaryColor = Color(0xFF6C63FF);
+const Color _primaryColor = Color(0xFF7B1FA2);
 const Color _successColor = Color(0xFF26C281);
 const Color _dangerColor = Color(0xFFEF4444);
 
@@ -151,7 +151,7 @@ class _DetailScreenState extends State<DetailScreen> {
     final changeColor = isPositive ? _successColor : _dangerColor;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: Colors.grey[50],
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(
@@ -186,10 +186,11 @@ class _DetailScreenState extends State<DetailScreen> {
 
   Widget _buildModernAppBar(Color changeColor) {
     return SliverAppBar(
-      expandedHeight: 120,
+      expandedHeight: 180,
       floating: false,
       pinned: true,
       backgroundColor: _primaryColor,
+      centerTitle: true,
       leading: IconButton(
         icon: Container(
           padding: const EdgeInsets.all(8),
@@ -215,7 +216,7 @@ class _DetailScreenState extends State<DetailScreen> {
               ),
               child: Icon(
                 _isFavorite ? Icons.favorite : Icons.favorite_border,
-                color: _isFavorite ? Colors.red.shade300 : Colors.white,
+                color: _isFavorite ? _primaryColor : Colors.white,
                 size: 22,
               ),
             ),
@@ -227,16 +228,17 @@ class _DetailScreenState extends State<DetailScreen> {
         background: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
+              colors: [Color(0xFF7B1FA2), Color(0xFFE53935)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFF6C63FF), Color(0xFF5A52D5)],
             ),
           ),
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(60, 20, 60, 16),
+              padding: const EdgeInsets.symmetric(vertical: 20.0),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Image.network(
                     widget.coin.image,
@@ -249,12 +251,19 @@ class _DetailScreenState extends State<DetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    widget.coin.name,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        widget.coin.name,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
                 ],

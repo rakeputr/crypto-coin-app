@@ -14,7 +14,7 @@ class MainAppScreen extends StatefulWidget {
 class _MainAppScreenState extends State<MainAppScreen> {
   int _selectedIndex = 0;
 
-  static const Color _primaryColor = Color(0xFF6C63FF);
+  static const Color _primaryColor = Color(0xFF7B1FA2);
   static const Color _inactiveColor = Color(0xFFB8B5C3);
 
   final List<Widget> _widgetOptions = <Widget>[
@@ -100,14 +100,19 @@ class _MainAppScreenState extends State<MainAppScreen> {
                 duration: const Duration(milliseconds: 200),
                 padding: EdgeInsets.all(isSelected ? 10 : 8),
                 decoration: BoxDecoration(
-                  color: isSelected
-                      ? _primaryColor.withOpacity(0.15)
-                      : Colors.transparent,
+                  gradient: isSelected
+                      ? const LinearGradient(
+                          colors: [Color(0xFF7B1FA2), Color(0xFFE53935)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : null,
+                  color: isSelected ? null : Colors.transparent,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
                   icon,
-                  color: isSelected ? _primaryColor : _inactiveColor,
+                  color: isSelected ? Colors.white : _inactiveColor,
                   size: isSelected ? 26 : 24,
                 ),
               ),
