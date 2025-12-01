@@ -6,8 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/favorite_service.dart';
 import '../services/notification_service.dart';
 
-const Color _primaryColor = Color(0xFF7B1FA2);
-const Color _accentColor = Color(0xFFE53935);
+const Color _primaryColor = Color(0xFF6C63FF);
+const Color _successColor = Color(0xFF26C281);
+const Color _dangerColor = Color(0xFFEF4444);
 
 class TimeZoneData {
   final String label;
@@ -66,7 +67,6 @@ class _DetailScreenState extends State<DetailScreen> {
     final userId = prefs.getString('userId');
 
     if (userId != null) {
-      // 🔥 Gunakan FavoriteService yang lebih cepat
       final isFav = await _favoriteService.isFavorite(userId, widget.coin.id);
       if (mounted) {
         setState(() {
@@ -85,8 +85,13 @@ class _DetailScreenState extends State<DetailScreen> {
   Future<void> _toggleFavorite() async {
     if (_currentUserId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Anda harus login untuk menambah ke favorit.'),
+        SnackBar(
+          content: const Text('You must login to add favorites'),
+          backgroundColor: _dangerColor,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
       return;
@@ -95,20 +100,19 @@ class _DetailScreenState extends State<DetailScreen> {
     final coinId = widget.coin.id;
     String notificationBody = '';
 
-    // 🔥 Gunakan FavoriteService yang lebih cepat
     if (_isFavorite) {
       await _favoriteService.removeFavorite(_currentUserId!, coinId);
-      notificationBody = '${widget.coin.name} telah dihapus dari Favorit.';
+      notificationBody = '${widget.coin.name} removed from favorites';
     } else {
       await _favoriteService.addFavorite(_currentUserId!, coinId);
-      notificationBody = '${widget.coin.name} telah ditambahkan ke Favorit!';
+      notificationBody = '${widget.coin.name} added to favorites!';
     }
 
     if (mounted) {
       setState(() => _isFavorite = !_isFavorite);
 
       NotificationService.showNotification(
-        title: 'Perubahan Daftar Favorit',
+        title: 'Favorites Updated',
         body: notificationBody,
       );
     }
@@ -137,196 +141,201 @@ class _DetailScreenState extends State<DetailScreen> {
       final formatter = DateFormat('dd MMM yyyy HH:mm:ss');
       return formatter.format(localTime);
     } catch (e) {
-      return "Waktu tidak valid";
+      return "Invalid time";
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isPositive = widget.coin.priceChangePercentage24h >= 0;
+    final changeColor = isPositive ? _successColor : _dangerColor;
+
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: Text(
-          'Detail ${widget.coin.name}',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: _primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
+      backgroundColor: const Color(0xFFF8F9FA),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: _primaryColor))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  _buildPriceHeader(),
-                  _buildFavoriteButton(),
-                  const SizedBox(height: 20),
-                  _buildKeyStatsCard(),
-                  const SizedBox(height: 20),
-                  _buildDetailRow(
-                    'Simbol',
-                    widget.coin.symbol.toUpperCase(),
-                    icon: Icons.sell_outlined,
-                    isTwoLineFormat: false,
-                  ),
-                  _buildExpandableCurrencyRow(),
-                  AnimatedCrossFade(
-                    duration: const Duration(milliseconds: 300),
-                    crossFadeState: _isCurrencyExpanded
-                        ? CrossFadeState.showFirst
-                        : CrossFadeState.showSecond,
-                    firstChild: Column(
-                      children: allCurrencies.sublist(1).map((currency) {
-                        final String formattedAmount = _formatCurrency(
-                          widget.coin.currentPrice,
-                          currency,
-                        );
-                        return _buildDetailRow(
-                          'Harga ${currency.code}',
-                          formattedAmount,
-                          icon: Icons.paid_outlined,
-                          isTwoLineFormat: false,
-                        );
-                      }).toList(),
-                    ),
-                    secondChild: const SizedBox.shrink(),
-                  ),
-                  _buildExpandableTimeRow(),
-                  AnimatedCrossFade(
-                    duration: const Duration(milliseconds: 300),
-                    crossFadeState: _isTimeExpanded
-                        ? CrossFadeState.showFirst
-                        : CrossFadeState.showSecond,
-                    firstChild: Column(
-                      children: allTimeZones.sublist(1).map((tz) {
-                        final String formattedTime =
-                            _formatDateTimeWithTimeZone(
-                              widget.coin.lastUpdated,
-                              tz.offset,
-                            );
-                        return _buildDetailRow(
-                          'Zona ${tz.label}',
-                          formattedTime,
-                          icon: Icons.access_time_filled,
-                          isTwoLineFormat: true,
-                        );
-                      }).toList(),
-                    ),
-                    secondChild: const SizedBox.shrink(),
-                  ),
-                ],
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: _primaryColor,
+                strokeWidth: 3,
               ),
+            )
+          : CustomScrollView(
+              slivers: [
+                _buildModernAppBar(changeColor),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        _buildPriceCard(changeColor),
+                        const SizedBox(height: 20),
+                        _buildKeyStatsCard(),
+                        const SizedBox(height: 20),
+                        _buildExpandableCurrencySection(),
+                        const SizedBox(height: 12),
+                        _buildExpandableTimeSection(),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
     );
   }
 
-  Widget _buildFavoriteButton() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 10.0),
-      child: Center(
-        child: InkWell(
-          onTap: _toggleFavorite,
-          borderRadius: BorderRadius.circular(50),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+  Widget _buildModernAppBar(Color changeColor) {
+    return SliverAppBar(
+      expandedHeight: 120,
+      floating: false,
+      pinned: true,
+      backgroundColor: _primaryColor,
+      leading: IconButton(
+        icon: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+        ),
+        onPressed: () => Navigator.pop(context),
+      ),
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: IconButton(
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _isFavorite
+                    ? Colors.white.withOpacity(0.3)
+                    : Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                _isFavorite ? Icons.favorite : Icons.favorite_border,
+                color: _isFavorite ? Colors.red.shade300 : Colors.white,
+                size: 22,
+              ),
+            ),
+            onPressed: _toggleFavorite,
+          ),
+        ),
+      ],
+      flexibleSpace: FlexibleSpaceBar(
+        background: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF6C63FF), Color(0xFF5A52D5)],
+            ),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(60, 20, 60, 16),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Image.network(
+                    widget.coin.image,
+                    height: 48,
+                    width: 48,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.currency_bitcoin,
+                      size: 48,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.coin.name,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPriceCard(Color changeColor) {
+    final usdCurrency = allCurrencies.firstWhere((c) => c.code == 'USD');
+    final isPositive = widget.coin.priceChangePercentage24h >= 0;
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Text(
+            'Current Price',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _formatCurrency(widget.coin.currentPrice, usdCurrency),
+            style: const TextStyle(
+              fontSize: 36,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF2D3142),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: _isFavorite ? _accentColor.withOpacity(0.1) : Colors.white,
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: _accentColor, width: 1.5),
+              color: changeColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  _isFavorite ? Icons.favorite : Icons.favorite_border,
-                  color: _accentColor,
-                  size: 24,
+                  isPositive ? Icons.trending_up : Icons.trending_down,
+                  size: 20,
+                  color: changeColor,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Text(
-                  _isFavorite ? 'DI FAVORIT' : 'TAMBAH KE FAVORIT',
-                  style: const TextStyle(
-                    color: _accentColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                  _formatPercentage(widget.coin.priceChangePercentage24h),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: changeColor,
                   ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '(24h)',
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                 ),
               ],
             ),
           ),
-        ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildPriceHeader() {
-    final isPositive = widget.coin.priceChangePercentage24h >= 0;
-    final color = isPositive ? Colors.green.shade700 : _accentColor;
-    final icon = isPositive ? Icons.arrow_upward : Icons.arrow_downward;
-    final usdCurrency = allCurrencies.firstWhere((c) => c.code == 'USD');
-
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Image.network(
-              widget.coin.image,
-              height: 40,
-              width: 40,
-              errorBuilder: (context, error, stackTrace) => const Icon(
-                Icons.currency_bitcoin,
-                size: 40,
-                color: _primaryColor,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Flexible(
-              child: Text(
-                widget.coin.name,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: _primaryColor,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Text(
-          _formatCurrency(widget.coin.currentPrice, usdCurrency),
-          style: const TextStyle(
-            fontSize: 48,
-            fontWeight: FontWeight.w900,
-            color: Colors.black87,
-          ),
-        ),
-        const SizedBox(height: 5),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 18, color: color),
-            const SizedBox(width: 5),
-            Text(
-              _formatPercentage(widget.coin.priceChangePercentage24h),
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: color,
-              ),
-            ),
-            const Text(
-              ' (24h)',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-          ],
-        ),
-      ],
     );
   }
 
@@ -334,275 +343,343 @@ class _DetailScreenState extends State<DetailScreen> {
     final usdCurrency = allCurrencies.firstWhere((c) => c.code == 'USD');
 
     return Container(
-      margin: const EdgeInsets.only(top: 15),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF7B1FA2), Color(0xFFE53935)],
-        ),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3)),
-        ],
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(2),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              _buildStatItem(
-                Icons.trending_up,
-                'Harga Tertinggi (24j)',
-                _formatCurrency(widget.coin.high24h, usdCurrency),
-                Colors.green,
-              ),
-              const Divider(),
-              _buildStatItem(
-                Icons.trending_down,
-                'Harga Terendah (24j)',
-                _formatCurrency(widget.coin.low24h, usdCurrency),
-                _accentColor,
-              ),
-              const Divider(),
-              _buildStatItem(
-                Icons.query_stats,
-                'Kapitalisasi Pasar',
-                _formatCurrency(widget.coin.marketCap, usdCurrency),
-                _primaryColor,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatItem(
-    IconData icon,
-    String label,
-    String value,
-    Color color,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 16, color: Colors.black87),
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildExpandableCurrencyRow() {
-    final CurrencyData usd = allCurrencies.firstWhere((c) => c.code == 'USD');
-    final String formattedPrice = _formatCurrency(
-      widget.coin.currentPrice,
-      usd,
-    );
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 0),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: _isCurrencyExpanded
-            ? const BorderRadius.only(
-                topLeft: Radius.circular(10),
-                topRight: Radius.circular(10),
-              )
-            : BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: InkWell(
-        onTap: () => setState(() => _isCurrencyExpanded = !_isCurrencyExpanded),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 10),
-          child: Row(
-            children: [
-              const Icon(Icons.paid_outlined, color: _primaryColor, size: 20),
-              const SizedBox(width: 15),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Konversi Mata Uang',
-                      style: TextStyle(fontSize: 15, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      formattedPrice,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                _isCurrencyExpanded
-                    ? Icons.keyboard_arrow_up
-                    : Icons.keyboard_arrow_down,
-                color: _primaryColor,
-              ),
-            ],
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-        ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Market Stats',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2D3142),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildStatRow(
+            Icons.arrow_upward,
+            '24h High',
+            _formatCurrency(widget.coin.high24h, usdCurrency),
+            _successColor,
+          ),
+          const SizedBox(height: 12),
+          _buildStatRow(
+            Icons.arrow_downward,
+            '24h Low',
+            _formatCurrency(widget.coin.low24h, usdCurrency),
+            _dangerColor,
+          ),
+          const SizedBox(height: 12),
+          _buildStatRow(
+            Icons.donut_large,
+            'Market Cap',
+            _formatCurrency(widget.coin.marketCap, usdCurrency),
+            _primaryColor,
+          ),
+          const SizedBox(height: 12),
+          _buildStatRow(
+            Icons.code,
+            'Symbol',
+            widget.coin.symbol.toUpperCase(),
+            Colors.grey.shade700,
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildExpandableTimeRow() {
-    final TimeZoneData mainTz = allTimeZones.first;
-    final String mainTime = _formatDateTimeWithTimeZone(
+  Widget _buildStatRow(IconData icon, String label, String value, Color color) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF2D3142),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildExpandableCurrencySection() {
+    final usd = allCurrencies.first;
+    final formattedPrice = _formatCurrency(widget.coin.currentPrice, usd);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () =>
+                setState(() => _isCurrencyExpanded = !_isCurrencyExpanded),
+            borderRadius: BorderRadius.circular(20),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: _primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.currency_exchange,
+                      color: _primaryColor,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Currency Conversion',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          formattedPrice,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF2D3142),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    _isCurrencyExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    color: _primaryColor,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 300),
+            crossFadeState: _isCurrencyExpanded
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
+            firstChild: Column(
+              children: allCurrencies.sublist(1).map((currency) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: Colors.grey.shade200, width: 1),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        currency.code,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        _formatCurrency(widget.coin.currentPrice, currency),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2D3142),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+            secondChild: const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExpandableTimeSection() {
+    final mainTz = allTimeZones.first;
+    final mainTime = _formatDateTimeWithTimeZone(
       widget.coin.lastUpdated,
       mainTz.offset,
     );
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 0),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: _isTimeExpanded
-            ? const BorderRadius.only(
-                topLeft: Radius.circular(10),
-                topRight: Radius.circular(10),
-              )
-            : BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: InkWell(
-        onTap: () => setState(() => _isTimeExpanded = !_isTimeExpanded),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 10),
-          child: Row(
-            children: [
-              const Icon(Icons.update, color: _primaryColor, size: 20),
-              const SizedBox(width: 15),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Terakhir Diperbarui (${mainTz.label})',
-                      style: const TextStyle(fontSize: 15, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      mainTime,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                _isTimeExpanded
-                    ? Icons.keyboard_arrow_up
-                    : Icons.keyboard_arrow_down,
-                color: _primaryColor,
-              ),
-            ],
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-        ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildDetailRow(
-    String label,
-    String value, {
-    required IconData icon,
-    required bool isTwoLineFormat,
-  }) {
-    if (!isTwoLineFormat) {
-      return Container(
-        margin: _isCurrencyExpanded || _isTimeExpanded
-            ? const EdgeInsets.only(bottom: 0)
-            : const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: _isCurrencyExpanded || _isTimeExpanded
-              ? null
-              : BorderRadius.circular(10),
-          border: _isCurrencyExpanded || _isTimeExpanded
-              ? null
-              : Border.all(color: Colors.grey.shade200),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: _primaryColor, size: 20),
-            const SizedBox(width: 15),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 15, color: Colors.grey),
-            ),
-            const Spacer(),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => setState(() => _isTimeExpanded = !_isTimeExpanded),
+            borderRadius: BorderRadius.circular(20),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: _primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.access_time,
+                      color: _primaryColor,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Last Updated (${mainTz.label})',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          mainTime,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF2D3142),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    _isTimeExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    color: _primaryColor,
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 0),
-      padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
-      decoration: const BoxDecoration(color: Colors.white),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: Colors.grey.shade400, size: 16),
-          const SizedBox(width: 25),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    color: Colors.black54,
-                    fontWeight: FontWeight.bold,
+          ),
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 300),
+            crossFadeState: _isTimeExpanded
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
+            firstChild: Column(
+              children: allTimeZones.sublist(1).map((tz) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 12,
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: Colors.grey.shade200, width: 1),
+                    ),
                   ),
-                ),
-              ],
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        tz.label,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        _formatDateTimeWithTimeZone(
+                          widget.coin.lastUpdated,
+                          tz.offset,
+                        ),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2D3142),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
             ),
+            secondChild: const SizedBox.shrink(),
           ),
         ],
       ),
