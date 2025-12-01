@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/coin_model.dart';
-import '../services/coin_service.dart';
-import '../services/database_helper.dart';
+import '../services/coin_cache_service.dart';
+import '../services/favorite_service.dart';
 import 'detail_screen.dart';
 import 'package:intl/intl.dart';
 
@@ -16,42 +16,85 @@ class FavoriteScreen extends StatefulWidget {
   State<FavoriteScreen> createState() => _FavoriteScreenState();
 }
 
-class _FavoriteScreenState extends State<FavoriteScreen> {
-  late Future<List<CoinModel>> _favoriteCoinsFuture;
-  final dbHelper = DatabaseHelper();
+class _FavoriteScreenState extends State<FavoriteScreen>
+    with AutomaticKeepAliveClientMixin {
+  final CoinCacheService _cacheService = CoinCacheService();
+  final FavoriteService _favoriteService = FavoriteService();
+
+  List<CoinModel> _favoriteCoins = [];
   String? _currentUserId;
+  bool _isLoading = true;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
-    _favoriteCoinsFuture = _fetchFavorites();
+    _loadFavorites();
   }
 
-  Future<List<CoinModel>> _fetchFavorites() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('userId');
+  Future<void> _loadFavorites() async {
+    if (!mounted) return;
 
-    if (userId == null) {
-      return [];
+    setState(() => _isLoading = true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('userId');
+
+      if (userId == null) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _currentUserId = null;
+          });
+        }
+        return;
+      }
+
+      _currentUserId = userId;
+
+      // 🔥 Ambil favorite IDs dari SharedPreferences (CEPAT!)
+      final favoriteIds = await _favoriteService.getFavorites(userId);
+
+      if (favoriteIds.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _favoriteCoins = [];
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
+      // 🔥 Ambil data coin dari CACHE, BUKAN dari API!
+      List<CoinModel>? allCoins = _cacheService.getCachedCoins();
+
+      // Jika cache kosong, fetch sekali saja
+      if (allCoins == null || allCoins.isEmpty) {
+        allCoins = await _cacheService.fetchCoins();
+      }
+
+      // Filter coin yang ada di favorites
+      final favoriteCoins = allCoins
+          .where((coin) => favoriteIds.contains(coin.id))
+          .toList();
+
+      if (mounted) {
+        setState(() {
+          _favoriteCoins = favoriteCoins;
+          _isLoading = false;
+        });
+      }
+
+      print('✅ Loaded ${favoriteCoins.length} favorite coins from CACHE');
+    } catch (e) {
+      print('Error loading favorites: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
-    _currentUserId = userId;
-
-    final favMaps = await dbHelper.getFavorites(userId);
-    final Set<String> favoriteCoinIds = favMaps
-        .map((map) => map['coinId'] as String)
-        .toSet();
-
-    if (favoriteCoinIds.isEmpty) {
-      return [];
-    }
-
-    final allCoins = await CoinService().fetchCoins();
-
-    final favoriteCoins = allCoins.where((coin) {
-      return favoriteCoinIds.contains(coin.id);
-    }).toList();
-
-    return favoriteCoins;
   }
 
   String _formatCurrency(double amount) {
@@ -59,85 +102,129 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
     return format.format(amount);
   }
 
-  void _refreshFavorites() {
-    setState(() {
-      _favoriteCoinsFuture = _fetchFavorites();
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
-
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           "Koin Favorit",
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: _primaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          // Tombol refresh
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadFavorites,
+            tooltip: 'Refresh',
+          ),
+        ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            const SizedBox(height: 20),
+      body: RefreshIndicator(
+        onRefresh: _loadFavorites,
+        color: _primaryColor,
+        child: _buildBody(),
+      ),
+    );
+  }
 
-            Expanded(
-              child: FutureBuilder<List<CoinModel>>(
-                future: _favoriteCoinsFuture,
-                builder: (context, snapshot) {
-                  if (_currentUserId == null) {
-                    return const Center(
-                      child: Text(
-                        'Anda harus login untuk melihat daftar favorit.',
+  Widget _buildBody() {
+    if (_currentUserId == null) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(30.0),
+          child: Text(
+            'Anda harus login untuk melihat daftar favorit.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16),
+          ),
+        ),
+      );
+    }
+
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: _primaryColor),
+      );
+    }
+
+    if (_favoriteCoins.isEmpty) {
+      return ListView(
+        children: const [
+          SizedBox(height: 100),
+          Center(
+            child: Column(
+              children: [
+                Icon(Icons.favorite_border, size: 80, color: Colors.grey),
+                SizedBox(height: 20),
+                Text(
+                  'Belum ada koin favorit',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 10),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 40),
+                  child: Text(
+                    'Tambahkan koin ke favorit untuk melihatnya di sini',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 20),
+          Text(
+            '${_favoriteCoins.length} Koin Favorit',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: ListView.builder(
+              itemCount: _favoriteCoins.length,
+              padding: const EdgeInsets.only(bottom: 20),
+              itemBuilder: (context, index) {
+                final coin = _favoriteCoins[index];
+                return _buildCryptoCard(
+                  context,
+                  coin: coin,
+                  onTap: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => DetailScreen(coin: coin),
                       ),
                     );
-                  }
-
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: CircularProgressIndicator(color: _primaryColor),
-                    );
-                  } else if (snapshot.hasError) {
-                    return Center(
-                      child: Text('Error memuat data: ${snapshot.error}'),
-                    );
-                  } else if (snapshot.data!.isEmpty) {
-                    return Center(
-                      child: Text('Anda belum menambahkan koin ke favorit.'),
-                    );
-                  } else {
-                    final favoriteCoins = snapshot.data!;
-                    return ListView.builder(
-                      itemCount: favoriteCoins.length,
-                      padding: const EdgeInsets.only(bottom: 20),
-                      itemBuilder: (context, index) {
-                        final coin = favoriteCoins[index];
-                        return _buildCryptoCard(
-                          context,
-                          coin: coin,
-                          onTap: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => DetailScreen(coin: coin),
-                              ),
-                            );
-                            _refreshFavorites();
-                          },
-                        );
-                      },
-                    );
-                  }
-                },
-              ),
+                    // Refresh setelah kembali dari detail
+                    _loadFavorites();
+                  },
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -155,7 +242,6 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       decoration: BoxDecoration(
-        //ganti warna card disini
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: Colors.grey.shade300, width: 1.5),

@@ -3,32 +3,26 @@ import 'package:project_crypto_app/models/coin_model.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../services/database_helper.dart';
+import '../services/favorite_service.dart';
 import '../services/notification_service.dart';
 
-// Konstanta warna utama
 const Color _primaryColor = Color(0xFF7B1FA2);
 const Color _accentColor = Color(0xFFE53935);
 
-// Struktur data untuk Timezone
 class TimeZoneData {
   final String label;
   final String offset;
-
   const TimeZoneData(this.label, this.offset);
 }
 
-// Struktur data untuk Mata Uang
 class CurrencyData {
   final String code;
   final String symbol;
   final double exchangeRate;
   final String locale;
-
   const CurrencyData(this.code, this.symbol, this.exchangeRate, this.locale);
 }
 
-// Daftar zona waktu yang tersedia
 const List<TimeZoneData> allTimeZones = [
   TimeZoneData('WIB (Jakarta)', '+0700'),
   TimeZoneData('WITA (Bali)', '+0800'),
@@ -36,7 +30,6 @@ const List<TimeZoneData> allTimeZones = [
   TimeZoneData('London (BST)', '+0100'),
 ];
 
-// Daftar mata uang yang tersedia
 const List<CurrencyData> allCurrencies = [
   CurrencyData('USD', '\$', 1.0, 'en_US'),
   CurrencyData('IDR', 'Rp', 16500.0, 'id_ID'),
@@ -53,14 +46,13 @@ class DetailScreen extends StatefulWidget {
 }
 
 class _DetailScreenState extends State<DetailScreen> {
-  // STATE untuk fitur favorite dan collapse
+  final FavoriteService _favoriteService = FavoriteService();
+
   bool _isTimeExpanded = false;
   bool _isCurrencyExpanded = false;
-
-  // STATE untuk status favorite dan ID Pengguna
   bool _isFavorite = false;
   String? _currentUserId;
-  final dbHelper = DatabaseHelper();
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -69,24 +61,28 @@ class _DetailScreenState extends State<DetailScreen> {
     _loadUserIdAndFavoriteStatus();
   }
 
-  // FUNGSI: Memuat ID pengguna dan status favorite
-  void _loadUserIdAndFavoriteStatus() async {
+  Future<void> _loadUserIdAndFavoriteStatus() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('userId');
 
     if (userId != null) {
-      final isFav = await dbHelper.isFavorite(userId, widget.coin.id);
+      // 🔥 Gunakan FavoriteService yang lebih cepat
+      final isFav = await _favoriteService.isFavorite(userId, widget.coin.id);
       if (mounted) {
         setState(() {
           _currentUserId = userId;
           _isFavorite = isFav;
+          _isLoading = false;
         });
+      }
+    } else {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
 
-  // FUNGSI: Toggle status favorite dan Kirim Notifikasi
-  void _toggleFavorite() async {
+  Future<void> _toggleFavorite() async {
     if (_currentUserId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -99,20 +95,18 @@ class _DetailScreenState extends State<DetailScreen> {
     final coinId = widget.coin.id;
     String notificationBody = '';
 
+    // 🔥 Gunakan FavoriteService yang lebih cepat
     if (_isFavorite) {
-      await dbHelper.removeFavorite(_currentUserId!, coinId);
+      await _favoriteService.removeFavorite(_currentUserId!, coinId);
       notificationBody = '${widget.coin.name} telah dihapus dari Favorit.';
     } else {
-      await dbHelper.addFavorite(_currentUserId!, coinId);
+      await _favoriteService.addFavorite(_currentUserId!, coinId);
       notificationBody = '${widget.coin.name} telah ditambahkan ke Favorit!';
     }
 
     if (mounted) {
-      setState(() {
-        _isFavorite = !_isFavorite;
-      });
+      setState(() => _isFavorite = !_isFavorite);
 
-      // KIRIM NOTIFIKASI LOKAL
       NotificationService.showNotification(
         title: 'Perubahan Daftar Favorit',
         body: notificationBody,
@@ -120,10 +114,8 @@ class _DetailScreenState extends State<DetailScreen> {
     }
   }
 
-  // Helper untuk format mata uang USD
   String _formatCurrency(double amount, CurrencyData currency) {
     final convertedAmount = amount * currency.exchangeRate;
-
     final format = NumberFormat.currency(
       locale: currency.locale,
       symbol: currency.symbol,
@@ -131,12 +123,10 @@ class _DetailScreenState extends State<DetailScreen> {
     return format.format(convertedAmount);
   }
 
-  // Helper untuk format persentase
   String _formatPercentage(double percentage) {
     return '${percentage.toStringAsFixed(2)}%';
   }
 
-  // Helper yang mengembalikan string waktu lengkap
   String _formatDateTimeWithTimeZone(String isoString, String offset) {
     try {
       final dateTime = DateTime.parse(isoString);
@@ -163,94 +153,76 @@ class _DetailScreenState extends State<DetailScreen> {
         backgroundColor: _primaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
-        // 🔥 HAPUS: actions: [...]
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            _buildPriceHeader(),
-
-            // 🔥 TAMBAHKAN: Tombol Love di sini
-            _buildFavoriteButton(),
-
-            const SizedBox(height: 20),
-
-            _buildKeyStatsCard(),
-            const SizedBox(height: 20),
-
-            // --- DETAIL TAMBAHAN ---
-
-            // 1. Simbol (Format satu baris)
-            _buildDetailRow(
-              'Simbol',
-              widget.coin.symbol.toUpperCase(),
-              icon: Icons.sell_outlined,
-              isTwoLineFormat: false,
-            ),
-
-            // 2. Konversi Mata Uang
-            _buildExpandableCurrencyRow(),
-            AnimatedCrossFade(
-              duration: const Duration(milliseconds: 300),
-              crossFadeState: _isCurrencyExpanded
-                  ? CrossFadeState.showFirst
-                  : CrossFadeState.showSecond,
-              firstChild: Column(
-                children: [
-                  ...allCurrencies.sublist(1).map((currency) {
-                    final String formattedAmount = _formatCurrency(
-                      widget.coin.currentPrice,
-                      currency,
-                    );
-
-                    return _buildDetailRow(
-                      'Harga ${currency.code}',
-                      formattedAmount,
-                      icon: Icons.paid_outlined,
-                      isTwoLineFormat: false,
-                    );
-                  }).toList(),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: _primaryColor))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  _buildPriceHeader(),
+                  _buildFavoriteButton(),
+                  const SizedBox(height: 20),
+                  _buildKeyStatsCard(),
+                  const SizedBox(height: 20),
+                  _buildDetailRow(
+                    'Simbol',
+                    widget.coin.symbol.toUpperCase(),
+                    icon: Icons.sell_outlined,
+                    isTwoLineFormat: false,
+                  ),
+                  _buildExpandableCurrencyRow(),
+                  AnimatedCrossFade(
+                    duration: const Duration(milliseconds: 300),
+                    crossFadeState: _isCurrencyExpanded
+                        ? CrossFadeState.showFirst
+                        : CrossFadeState.showSecond,
+                    firstChild: Column(
+                      children: allCurrencies.sublist(1).map((currency) {
+                        final String formattedAmount = _formatCurrency(
+                          widget.coin.currentPrice,
+                          currency,
+                        );
+                        return _buildDetailRow(
+                          'Harga ${currency.code}',
+                          formattedAmount,
+                          icon: Icons.paid_outlined,
+                          isTwoLineFormat: false,
+                        );
+                      }).toList(),
+                    ),
+                    secondChild: const SizedBox.shrink(),
+                  ),
+                  _buildExpandableTimeRow(),
+                  AnimatedCrossFade(
+                    duration: const Duration(milliseconds: 300),
+                    crossFadeState: _isTimeExpanded
+                        ? CrossFadeState.showFirst
+                        : CrossFadeState.showSecond,
+                    firstChild: Column(
+                      children: allTimeZones.sublist(1).map((tz) {
+                        final String formattedTime =
+                            _formatDateTimeWithTimeZone(
+                              widget.coin.lastUpdated,
+                              tz.offset,
+                            );
+                        return _buildDetailRow(
+                          'Zona ${tz.label}',
+                          formattedTime,
+                          icon: Icons.access_time_filled,
+                          isTwoLineFormat: true,
+                        );
+                      }).toList(),
+                    ),
+                    secondChild: const SizedBox.shrink(),
+                  ),
                 ],
               ),
-              secondChild: const SizedBox.shrink(),
             ),
-
-            // 3. Zona Waktu
-            _buildExpandableTimeRow(),
-
-            AnimatedCrossFade(
-              duration: const Duration(milliseconds: 300),
-              crossFadeState: _isTimeExpanded
-                  ? CrossFadeState.showFirst
-                  : CrossFadeState.showSecond,
-              firstChild: Column(
-                children: [
-                  ...allTimeZones.sublist(1).map((tz) {
-                    final String formattedTime = _formatDateTimeWithTimeZone(
-                      widget.coin.lastUpdated,
-                      tz.offset,
-                    );
-
-                    return _buildDetailRow(
-                      'Zona ${tz.label}',
-                      formattedTime,
-                      icon: Icons.access_time_filled,
-                      isTwoLineFormat: true,
-                    );
-                  }).toList(),
-                ],
-              ),
-              secondChild: const SizedBox.shrink(),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
-  // 🔥 WIDGET BARU: Tombol Favorite yang dipindahkan
   Widget _buildFavoriteButton() {
     return Padding(
       padding: const EdgeInsets.only(top: 10.0),
@@ -326,7 +298,6 @@ class _DetailScreenState extends State<DetailScreen> {
           ],
         ),
         const SizedBox(height: 10),
-
         Text(
           _formatCurrency(widget.coin.currentPrice, usdCurrency),
           style: const TextStyle(
@@ -336,7 +307,6 @@ class _DetailScreenState extends State<DetailScreen> {
           ),
         ),
         const SizedBox(height: 5),
-
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -365,31 +335,23 @@ class _DetailScreenState extends State<DetailScreen> {
 
     return Container(
       margin: const EdgeInsets.only(top: 15),
-
-      // OUTER: GRADIENT BORDER + SHADOW
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFF7B1FA2), // ungu
-            Color(0xFFE53935), // merah
-          ],
+          colors: [Color(0xFF7B1FA2), Color(0xFFE53935)],
         ),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3)),
         ],
       ),
-
       child: Container(
-        padding: const EdgeInsets.all(2), // membuat border terlihat
-        // INNER WHITE CARD
+        padding: const EdgeInsets.all(2),
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
           ),
           padding: const EdgeInsets.all(20),
-
           child: Column(
             children: [
               _buildStatItem(
@@ -466,11 +428,7 @@ class _DetailScreenState extends State<DetailScreen> {
         border: Border.all(color: Colors.grey.shade200),
       ),
       child: InkWell(
-        onTap: () {
-          setState(() {
-            _isCurrencyExpanded = !_isCurrencyExpanded;
-          });
-        },
+        onTap: () => setState(() => _isCurrencyExpanded = !_isCurrencyExpanded),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 10),
           child: Row(
@@ -530,11 +488,7 @@ class _DetailScreenState extends State<DetailScreen> {
         border: Border.all(color: Colors.grey.shade200),
       ),
       child: InkWell(
-        onTap: () {
-          setState(() {
-            _isTimeExpanded = !_isTimeExpanded;
-          });
-        },
+        onTap: () => setState(() => _isTimeExpanded = !_isTimeExpanded),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 10),
           child: Row(

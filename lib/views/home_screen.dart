@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:project_crypto_app/views/detail_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/coin_model.dart';
-import '../services/coin_service.dart';
+import '../services/coin_cache_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -11,173 +11,228 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  late Future<List<CoinModel>> futureCoins;
-  List<CoinModel> allCoins = [];
-  List<CoinModel> filteredCoins = [];
+class _HomeScreenState extends State<HomeScreen>
+    with AutomaticKeepAliveClientMixin {
+  final CoinCacheService _cacheService = CoinCacheService();
+  final TextEditingController _searchController = TextEditingController();
 
-  final TextEditingController searchController = TextEditingController();
+  List<CoinModel> _allCoins = [];
+  List<CoinModel> _filteredCoins = [];
+  String? _fullName;
+  bool _isLoading = true;
+  String? _errorMessage;
 
-  String? fullName;
+  // Untuk mencegah rebuild saat switch tab
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
-    futureCoins = CoinService().fetchCoins();
-    _loadUserData();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    await _loadUserData();
+    await _fetchCoins();
   }
 
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     final savedName = prefs.getString('fullName');
-    debugPrint('Nama dari prefs: $savedName');
-
     if (mounted) {
+      setState(() => _fullName = savedName ?? 'User');
+    }
+  }
+
+  Future<void> _fetchCoins({bool forceRefresh = false}) async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Gunakan cache service
+      final coins = await _cacheService.fetchCoins(forceRefresh: forceRefresh);
+
+      if (!mounted) return;
+
       setState(() {
-        fullName = savedName ?? 'User';
+        _allCoins = coins;
+        _filteredCoins = coins;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      final errorMsg = e.toString();
+      setState(() {
+        _isLoading = false;
+        _errorMessage = errorMsg.contains('429')
+            ? 'Terlalu banyak permintaan.\nSilakan tunggu beberapa menit.'
+            : 'Gagal memuat data.\n$errorMsg';
       });
     }
   }
 
-  @override
-  void dispose() {
-    searchController.dispose();
-    super.dispose();
-  }
-
   void _filterCoins(String query) {
-    final searchLower = query.toLowerCase();
-
     if (query.isEmpty) {
-      setState(() => filteredCoins = allCoins);
+      setState(() => _filteredCoins = _allCoins);
       return;
     }
 
-    final results = allCoins.where((coin) {
-      final nameLower = coin.name.toLowerCase();
-      final symbolLower = coin.symbol.toLowerCase();
-      return nameLower.contains(searchLower) ||
-          symbolLower.contains(searchLower);
+    final searchLower = query.toLowerCase();
+    final results = _allCoins.where((coin) {
+      return coin.name.toLowerCase().contains(searchLower) ||
+          coin.symbol.toLowerCase().contains(searchLower);
     }).toList();
 
-    setState(() => filteredCoins = results);
+    setState(() => _filteredCoins = results);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Penting untuk AutomaticKeepAliveClientMixin
+
     final mediaQuery = MediaQuery.of(context);
     final topPadding = mediaQuery.padding.top;
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      body: Stack(
-        children: [
-          _buildGradientHeaderCard(context, topPadding),
-          Padding(
-            padding: EdgeInsets.only(top: topPadding + 200),
-            child: FutureBuilder<List<CoinModel>>(
-              future: futureCoins,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  final errorMsg = snapshot.error.toString();
+      body: RefreshIndicator(
+        onRefresh: () => _fetchCoins(forceRefresh: true),
+        color: const Color(0xFF7B1FA2),
+        child: Stack(
+          children: [
+            _buildGradientHeaderCard(context, topPadding),
+            Padding(
+              padding: EdgeInsets.only(top: topPadding + 200),
+              child: _buildContent(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-                  // Jika error 429 Too Many Requests
-                  if (errorMsg.contains('429')) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.error, color: Colors.red, size: 60),
-                          const SizedBox(height: 10),
-                          const Text(
-                            'Terlalu banyak permintaan.\nSilakan coba lagi nanti.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 16),
-                          ),
-                          const SizedBox(height: 15),
-                          ElevatedButton(
-                            onPressed: () {
-                              setState(() {
-                                futureCoins = CoinService().fetchCoins();
-                              });
-                            },
-                            child: const Text('Refresh'),
-                          ),
-                        ],
+  Widget _buildContent() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF7B1FA2)),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 60),
+              const SizedBox(height: 15),
+              Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: () => _fetchCoins(forceRefresh: true),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Coba Lagi'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF7B1FA2),
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Rekomendasi Crypto',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              // Indikator cache
+              if (_cacheService.isCacheValid())
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.check_circle,
+                        size: 14,
+                        color: Colors.green.shade700,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Cached',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.green.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: _filteredCoins.length,
+              padding: const EdgeInsets.only(bottom: 20),
+              // Optimasi performa dengan itemExtent
+              itemExtent: 90,
+              itemBuilder: (context, index) {
+                final coin = _filteredCoins[index];
+                return _CryptoCard(
+                  key: ValueKey(coin.id),
+                  coin: coin,
+                  onTap: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => DetailScreen(coin: coin),
                       ),
                     );
-                  }
-
-                  // Error lain
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text('Error: $errorMsg'),
-                        const SizedBox(height: 10),
-                        ElevatedButton(
-                          onPressed: () {
-                            setState(() {
-                              futureCoins = CoinService().fetchCoins();
-                            });
-                          },
-                          child: const Text('Coba Lagi'),
-                        ),
-                      ],
-                    ),
-                  );
-                } else {
-                  if (allCoins.isEmpty) {
-                    allCoins = snapshot.data!;
-                    filteredCoins = allCoins;
-                  }
-
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Rekomendasi Crypto',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: filteredCoins.length,
-                            itemBuilder: (context, index) {
-                              final coin = filteredCoins[index];
-                              return _buildCryptoCard(
-                                context,
-                                title:
-                                    '${coin.name} (${coin.symbol.toUpperCase()})',
-                                subtitle:
-                                    'Harga: \$${coin.currentPrice.toStringAsFixed(2)} | 24h: ${coin.priceChangePercentage24h.toStringAsFixed(2)}%',
-                                imageUrl: coin.image,
-                                isUp: coin.priceChangePercentage24h >= 0,
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          DetailScreen(coin: coin),
-                                    ),
-                                  );
-                                },
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
+                    // Refresh data jika perlu setelah kembali
+                    if (!_cacheService.isCacheValid()) {
+                      _fetchCoins();
+                    }
+                  },
+                );
               },
             ),
           ),
@@ -215,14 +270,13 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             const SizedBox(height: 10),
             Text(
-              fullName == null ? 'Hi,' : 'Hi, $fullName',
+              _fullName == null ? 'Hi,' : 'Hi, $_fullName',
               style: const TextStyle(
                 color: Colors.white70,
                 fontSize: 18,
                 fontWeight: FontWeight.w500,
               ),
             ),
-
             const SizedBox(height: 5),
             const Text(
               'Lihat Harga Coin Crypto Saat Ini',
@@ -233,14 +287,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            _buildSearchBar(context),
+            _buildSearchBar(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSearchBar(BuildContext context) {
+  Widget _buildSearchBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 15),
       decoration: BoxDecoration(
@@ -248,59 +302,54 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(15),
       ),
       child: TextField(
-        controller: searchController,
+        controller: _searchController,
         style: const TextStyle(color: Colors.white),
         onChanged: (query) {
           _filterCoins(query);
-          setState(() {});
         },
         decoration: InputDecoration(
           hintText: 'Cari nama atau simbol crypto...',
           hintStyle: const TextStyle(color: Colors.white70),
           border: InputBorder.none,
           icon: const Icon(Icons.search, color: Colors.white),
-          suffixIcon: searchController.text.isNotEmpty
-              ? Padding(
-                  padding: const EdgeInsets.only(right: 0),
-                  child: IconButton(
-                    icon: const Icon(Icons.clear, color: Colors.white70),
-                    splashRadius: 18,
-                    onPressed: () {
-                      searchController.clear();
-                      _filterCoins('');
-                      setState(() {});
-                    },
-                  ),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear, color: Colors.white70),
+                  splashRadius: 18,
+                  onPressed: () {
+                    _searchController.clear();
+                    _filterCoins('');
+                  },
                 )
               : null,
         ),
       ),
     );
   }
+}
 
-  Widget _buildCryptoCard(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-    required String imageUrl,
-    required bool isUp,
-    required VoidCallback onTap,
-  }) {
+// Widget terpisah untuk optimasi rebuild
+class _CryptoCard extends StatelessWidget {
+  final CoinModel coin;
+  final VoidCallback onTap;
+
+  const _CryptoCard({Key? key, required this.coin, required this.onTap})
+    : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final isUp = coin.priceChangePercentage24h >= 0;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 15),
-
-        // OUTER: GRADIENT BORDER + SHADOW
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           gradient: const LinearGradient(
-            colors: [
-              Color(0xFF7B1FA2), // ungu
-              Color(0xFFE53935), // merah
-            ],
+            colors: [Color(0xFF7B1FA2), Color(0xFFE53935)],
           ),
-          boxShadow: [
+          boxShadow: const [
             BoxShadow(
               color: Colors.black12,
               blurRadius: 8,
@@ -308,63 +357,62 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-
-        // PADDING UNTUK BORDER GRADIENT (PENTING!)
         child: Container(
-          padding: const EdgeInsets.all(
-            2,
-          ), // <= INI YANG BIKIN GRADIENT KELIATAN
-
+          padding: const EdgeInsets.all(2),
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-
-            // INNER WHITE CARD
             decoration: BoxDecoration(
-              //ganti warna card disini
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
             ),
-
             child: Row(
               children: [
-                // ICON / IMAGE
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: Colors.grey.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Image.network(imageUrl, width: 35, height: 35),
+                  child: Image.network(
+                    coin.image,
+                    width: 35,
+                    height: 35,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.currency_bitcoin,
+                      size: 35,
+                      color: Color(0xFF7B1FA2),
+                    ),
+                  ),
                 ),
-
                 const SizedBox(width: 14),
-
-                // TEXT
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        title,
+                        '${coin.name} (${coin.symbol.toUpperCase()})',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                           color: Colors.black,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        subtitle,
+                        'Harga: \$${coin.currentPrice.toStringAsFixed(2)} | 24h: ${coin.priceChangePercentage24h.toStringAsFixed(2)}%',
                         style: const TextStyle(
                           fontSize: 13,
                           color: Colors.black54,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
-
-                // ICON UP/DOWN
                 Icon(
                   isUp ? Icons.trending_up : Icons.trending_down,
                   color: isUp ? Colors.green : Colors.red,
